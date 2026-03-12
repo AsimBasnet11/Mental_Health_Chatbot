@@ -26,7 +26,9 @@ class LLMResponder:
         Local mode: Only used if LLM_API_URL is not set AND the .gguf
         file exists locally.
         """
-        self.remote_url = os.environ.get("LLM_API_URL", "").strip()
+        self.remote_url = os.environ.get(
+            "LLM_API_URL", "https://spongy-kynlee-unflat.ngrok-free.dev"
+        ).strip()
         self.llm = None
 
         if self.remote_url:
