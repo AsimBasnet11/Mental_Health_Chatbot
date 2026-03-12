@@ -85,24 +85,58 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       .join(' ');
   };
 
-  // Text-to-Speech — reads bot response aloud
-  const speakResponse = (text) => {
+  // Text-to-Speech — uses Edge TTS neural voices via backend
+  const ttsAudioRef = useRef(null);
+
+  const speakResponse = async (text) => {
     if (!ttsEnabled || !text) return;
+
+    // Stop any current playback
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    // Prefer a female English voice for warmth
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
-      || voices.find(v => v.lang.startsWith('en-') && !v.name.toLowerCase().includes('male'))
-      || voices.find(v => v.lang.startsWith('en'));
-    if (preferred) utterance.voice = preferred;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+
+    try {
+      setIsSpeaking(true);
+      const res = await fetch(`${API_BASE}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice: "en-US-JennyNeural" })
+      });
+
+      if (!res.ok) throw new Error("TTS failed");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      ttsAudioRef.current = audio;
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+        ttsAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+        ttsAudioRef.current = null;
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error('[TTS] Backend TTS failed, falling back to browser:', err);
+      setIsSpeaking(false);
+      // Fallback to browser TTS
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.92;
+      utterance.pitch = 1.05;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   // Analyze text with full pipeline (same as chat page)
@@ -545,6 +579,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
+      if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
       if (isListening) {
         stopRecording();
       }
@@ -625,7 +660,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
             {/* TTS Toggle */}
             <button
-              onClick={() => { setTtsEnabled(prev => { if (prev) window.speechSynthesis.cancel(); return !prev; }); setIsSpeaking(false); }}
+              onClick={() => { setTtsEnabled(prev => { if (prev) { window.speechSynthesis.cancel(); if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; } } return !prev; }); setIsSpeaking(false); }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
                 ${ttsEnabled
                   ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'

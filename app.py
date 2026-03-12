@@ -19,8 +19,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
+import asyncio
+import io
+import edge_tts
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from passlib.context import CryptContext
@@ -133,6 +137,9 @@ class AnalyzeIn(BaseModel):
     text: str; session_id: Optional[str] = None
 class SummaryIn(BaseModel):
     session_id: str = "default"
+class TTSIn(BaseModel):
+    text: str
+    voice: str = "en-US-JennyNeural"
 
 
 # ── Session store with TTL-based cleanup (#6) ───────────────
@@ -311,6 +318,26 @@ def analyze(body: AnalyzeIn, current_user=Depends(get_optional_user)):
         except Exception as e:
             log.error("Failed to save analysis: %s", e)
     return result
+
+
+# ── Text-to-Speech (Edge TTS — natural neural voices) ───────
+@app.post("/api/tts")
+async def tts(body: TTSIn):
+    if not body.text or not body.text.strip():
+        raise HTTPException(400, "Text cannot be empty.")
+    text = body.text.strip()[:2000]  # Limit length
+    try:
+        communicate = edge_tts.Communicate(text, body.voice, rate="+10%")
+        audio_buffer = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_buffer.write(chunk["data"])
+        audio_buffer.seek(0)
+        return StreamingResponse(audio_buffer, media_type="audio/mpeg",
+            headers={"Content-Disposition": "inline; filename=tts.mp3"})
+    except Exception as e:
+        log.error("TTS failed: %s", e)
+        raise HTTPException(500, "TTS generation failed.")
 
 
 @app.get("/api/conversations")
