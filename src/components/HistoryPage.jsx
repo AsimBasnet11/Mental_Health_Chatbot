@@ -8,7 +8,7 @@ function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
 
 const HistoryPage = ({
-  onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick,
+  onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick,
   user, onLogout, onNewChat, onContinueConversation
 }) => {
   const [conversations, setConversations] = useState([]);
@@ -86,7 +86,7 @@ const HistoryPage = ({
   return (
     <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
       <Sidebar onHomeClick={onHomeClick} onMentalStateClick={onMentalStateClick}
-        onHistoryClick={onHistoryClick} onFAQsClick={onFAQsClick}
+        onHistoryClick={onHistoryClick} onFAQsClick={onFAQsClick} onSummaryClick={onSummaryClick}
         currentPage="history" user={user} onLogout={onLogout} onNewChat={onNewChat} />
 
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">

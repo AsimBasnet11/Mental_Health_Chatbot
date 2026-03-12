@@ -273,8 +273,8 @@ def chat(body: ChatIn, current_user=Depends(get_optional_user)):
                 conn.execute("INSERT INTO messages (conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
                     (conv_id, "assistant", result["response"], now))
 
-                # Enhancement #10: Reuse all_scores from pipeline result instead of re-running inference
-                if result.get("show_analysis") and result.get("category"):
+                # Always store analysis (detection now runs for every message)
+                if result.get("category"):
                     all_scores = result.get("all_scores", {})
                     conn.execute("""INSERT INTO analysis_history
                         (user_id,session_id,user_text,mental_label,mental_conf,emotion_label,emotion_conf,all_scores,high_risk,timestamp)
@@ -352,21 +352,23 @@ def delete_conversation(session_id: str, current_user=Depends(get_current_user))
         if not conv: raise HTTPException(404, "Conversation not found.")
         conn.execute("DELETE FROM messages WHERE conversation_id=?", (conv["id"],))
         conn.execute("DELETE FROM conversations WHERE id=?", (conv["id"],))
+        # Also clear analysis data for this session
+        conn.execute("DELETE FROM analysis_history WHERE session_id=? AND user_id=?",
+            (session_id, current_user["user_id"]))
         conn.commit()
-        sessions.pop(session_id, None)
-        _session_last_access.pop(session_id, None)
         return {"message": "Conversation deleted."}
 
 
 @app.delete("/api/conversations")
 def clear_all_conversations(current_user=Depends(get_current_user)):
     with get_db() as conn:
-        for c in conn.execute("SELECT id,session_id FROM conversations WHERE user_id=?",
-            (current_user["user_id"],)).fetchall():
+        conv_rows = conn.execute("SELECT id FROM conversations WHERE user_id=?",
+            (current_user["user_id"],)).fetchall()
+        for c in conv_rows:
             conn.execute("DELETE FROM messages WHERE conversation_id=?", (c["id"],))
-            sessions.pop(c["session_id"], None)
-            _session_last_access.pop(c["session_id"], None)
         conn.execute("DELETE FROM conversations WHERE user_id=?", (current_user["user_id"],))
+        # Also clear ALL analysis history and summaries
+        conn.execute("DELETE FROM analysis_history WHERE user_id=?", (current_user["user_id"],))
         conn.commit()
         return {"message": "All conversations cleared."}
 
@@ -374,7 +376,7 @@ def clear_all_conversations(current_user=Depends(get_current_user)):
 @app.get("/history")
 def get_analysis_history(current_user=Depends(get_current_user)):
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM analysis_history WHERE user_id=? ORDER BY timestamp DESC LIMIT 50",
+        rows = conn.execute("SELECT * FROM analysis_history WHERE user_id=? ORDER BY timestamp DESC LIMIT 500",
             (current_user["user_id"],)).fetchall()
         return {"history": [{
             "id": r["id"], "sessionId": r["session_id"], "userText": r["user_text"],
@@ -403,7 +405,7 @@ def summary(body: SummaryIn):
     h = sessions.get(body.session_id)
     if not h: return {"message_count": 0, "summary_text": "No messages."}
     r = end_session(h)
-    sessions.pop(body.session_id, None)
+    # Do NOT pop the session — keep it alive so the user can continue chatting
     return r
 
 @app.get("/health")

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaQuestionCircle, FaArrowLeft, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
-const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, user, onLogout, onNewChat }) => {
+const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, user, onLogout, onNewChat }) => {
   const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
@@ -60,6 +60,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick}
         onFAQsClick={onFAQsClick}
+        onSummaryClick={onSummaryClick}
         currentPage="faqs"
         user={user} onLogout={onLogout} onNewChat={onNewChat}
       />

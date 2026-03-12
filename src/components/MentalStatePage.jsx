@@ -122,6 +122,27 @@ const aggregateSession = (messages) => {
     if (conf > topMentalConf) { topMentalLabel = label; topMentalConf = conf; }
   });
 
+  // Fallback: if allScores was empty, use direct mentalHealth label/confidence
+  if (topMentalLabel === 'Unknown' || topMentalConf === 0) {
+    const labelCount = {};
+    messages.forEach(m => {
+      const label = getItemMentalLabel(m);
+      const conf = getItemMentalConf(m);
+      if (label && label !== 'Unknown') {
+        if (!labelCount[label]) labelCount[label] = { total: 0, count: 0 };
+        labelCount[label].total += conf;
+        labelCount[label].count += 1;
+      }
+    });
+    Object.entries(labelCount).forEach(([label, { total, count }]) => {
+      const avg = total / count;
+      if (count > 0 && avg > topMentalConf) {
+        topMentalLabel = label; topMentalConf = parseFloat(avg.toFixed(1));
+        avgMentalScores[label] = topMentalConf;
+      }
+    });
+  }
+
   // --- Emotion: count frequency and average confidence ---
   const emotionMap = {};
   messages.forEach(m => {
@@ -374,7 +395,7 @@ const EmotionDistributionChart = ({ emotionMap }) => {
 /* ══════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
    ══════════════════════════════════════════════════════════ */
-const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onLogout, user, currentSessionId }) => {
+const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, onNewChat, onLogout, user, currentSessionId }) => {
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messagesOpen, setMessagesOpen] = useState(false);
@@ -457,8 +478,15 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
     }));
   }, [analysisHistory, currentSessionId]);
 
-  /* ─── No data yet ─── */
-  if (!loading && currentSessionMessages.length === 0) {
+  // Auto-show past sessions when current session has no data
+  useEffect(() => {
+    if (!loading && currentSessionMessages.length === 0 && pastSessions.length > 0) {
+      setShowPastSessions(true);
+    }
+  }, [loading, currentSessionMessages.length, pastSessions.length]);
+
+  /* ─── No data at all ─── */
+  if (!loading && currentSessionMessages.length === 0 && pastSessions.length === 0) {
     return (
       <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
         <Sidebar
@@ -466,6 +494,8 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
           onMentalStateClick={onMentalStateClick}
           onHistoryClick={onHistoryClick}
           onFAQsClick={onFAQsClick}
+          onSummaryClick={onSummaryClick}
+          onNewChat={onNewChat}
           onLogout={onLogout}
           currentPage="mental-state"
           user={user}
@@ -494,6 +524,8 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
         onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick}
         onFAQsClick={onFAQsClick}
+        onSummaryClick={onSummaryClick}
+        onNewChat={onNewChat}
         onLogout={onLogout}
         currentPage="mental-state"
         user={user}
@@ -528,7 +560,11 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                   Session Analysis
                 </h1>
                 <p className="text-sm text-purple-300/60">
-                  {currentSessionMessages.length} message{currentSessionMessages.length !== 1 ? 's' : ''} analyzed in this session
+                  {currentSessionMessages.length > 0
+                    ? `${currentSessionMessages.length} message${currentSessionMessages.length !== 1 ? 's' : ''} analyzed in this session`
+                    : pastSessions.length > 0
+                      ? `${pastSessions.length} past session${pastSessions.length !== 1 ? 's' : ''} available`
+                      : 'No messages analyzed yet'}
                 </p>
               </div>
             </div>
@@ -561,6 +597,21 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
             </div>
           ) : (
           <div className="max-w-6xl mx-auto space-y-6">
+
+            {/* No current session data notice */}
+            {currentSessionMessages.length === 0 && pastSessions.length > 0 && (
+              <div className="bg-purple-600/10 border border-purple-500/20 rounded-2xl p-5 flex items-center gap-4">
+                <FaBrain className="text-3xl text-purple-400 shrink-0" />
+                <div>
+                  <h3 className="text-purple-200 font-semibold">No analysis for this session yet</h3>
+                  <p className="text-purple-300/60 text-sm mt-1">Start chatting to see real-time analysis. Your past sessions are shown below.</p>
+                </div>
+                <button onClick={onBack}
+                  className="ml-auto px-4 py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-full transition-all flex items-center gap-2 text-sm shrink-0">
+                  <FaArrowLeft className="text-xs" /> Chat
+                </button>
+              </div>
+            )}
 
             {/* ══ OVERALL SESSION RESULT ══ */}
             {sessionResult && (
@@ -643,6 +694,7 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
             )}
 
             {/* ══ CHARTS ROW ══ */}
+            {currentSessionMessages.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Mental State Breakdown Bar Chart */}
               {sessionResult?.avgMentalScores && Object.keys(sessionResult.avgMentalScores).length > 0 && (
@@ -653,11 +705,15 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                 <EmotionDistributionChart emotionMap={sessionResult.emotionMap} />
               )}
             </div>
+            )}
 
             {/* ══ SESSION TREND LINE CHART ══ */}
-            <SessionTrendGraph messages={currentSessionMessages} />
+            {currentSessionMessages.length > 0 && (
+              <SessionTrendGraph messages={currentSessionMessages} />
+            )}
 
             {/* ══ INDIVIDUAL MESSAGES (collapsible) ══ */}
+            {currentSessionMessages.length > 0 && (
             <div className="bg-[#1a1035]/60 border border-purple-500/20 rounded-2xl backdrop-blur-md overflow-hidden">
               <button
                 onClick={() => setMessagesOpen(!messagesOpen)}
@@ -708,6 +764,7 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                 </div>
               )}
             </div>
+            )}
 
             {/* Disclaimer */}
             <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6">

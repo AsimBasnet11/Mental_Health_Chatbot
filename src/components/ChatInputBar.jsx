@@ -29,13 +29,13 @@ const ChatInputBar = ({ message, setMessage, sendMessage, onVoiceClick, onNewCha
           <FaMicrophone className="text-white" />
         </button>
 
-        <div className="flex flex-1 relative">
+        <div className="flex flex-1 items-center relative">
           <input type="text" placeholder="Write Text Here..." value={message}
             onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKeyPress}
-            className="w-full bg-[#1a1035]/50 border border-purple-500/30 rounded-full px-4 py-3 pr-12 text-white placeholder-purple-300/50 focus:outline-none focus:border-purple-400 transition-colors" />
+            className="w-full bg-[#1a1035]/50 border border-purple-500/30 rounded-full pl-4 pr-12 py-3 text-white placeholder-purple-300/50 focus:outline-none focus:border-purple-400 transition-colors" />
           <button onClick={sendMessage}
-            className="absolute right-1 top-1.5 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center hover:bg-purple-600/20 transition-all animate-float shadow-[0_0_10px_rgba(138,43,226,0.4)] hover:shadow-[0_0_20px_rgba(138,43,226,0.7)]">
-            <FaPaperPlane className="text-white" />
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center bg-purple-600/30 hover:bg-purple-600/50 transition-all shadow-[0_0_10px_rgba(138,43,226,0.4)] hover:shadow-[0_0_20px_rgba(138,43,226,0.7)]">
+            <FaPaperPlane className="text-white text-sm" />
           </button>
         </div>
 

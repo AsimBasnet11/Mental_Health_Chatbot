@@ -5,7 +5,7 @@ import VoicePage from './components/VoicePage';
 import MentalStatePage from './components/MentalStatePage';
 import HistoryPage from './components/HistoryPage';
 import FAQsPage from './components/FAQsPage';
-import SessionSummary from './components/SessionSummary';
+import SessionSummaryPage from './components/SessionSummaryPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 
@@ -34,7 +34,6 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentPage, setCurrentPage] = useState('home');
   const sessionIdRef = useRef('session_' + Date.now());
-  const [sessionSummary, setSessionSummary] = useState(null);
   const [sessionEnded, setSessionEnded] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -74,7 +73,6 @@ function App() {
     setCurrentPage('home');
     sessionIdRef.current = 'session_' + Date.now();
     setSessionEnded(false);
-    setSessionSummary(null);
   };
 
   // ─── Auth gate ───
@@ -90,7 +88,6 @@ function App() {
     sessionIdRef.current = 'session_' + Date.now();
     setMessages([]);
     setSessionEnded(false);
-    setSessionSummary(null);
     setCurrentPage('home');
     showWelcome();
   };
@@ -99,7 +96,6 @@ function App() {
   const handleContinueConversation = async (sid) => {
     sessionIdRef.current = sid;
     setSessionEnded(false);
-    setSessionSummary(null);
     setCurrentPage('home');
     try {
       const res = await fetch(`${API_BASE}/api/conversations/${sid}`, { headers: authHeaders() });
@@ -161,15 +157,17 @@ function App() {
   };
 
   const handleEndSession = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/summary`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ session_id: sessionIdRef.current })
-      });
-      const data = await res.json();
-      if (data.message_count > 0) { setSessionSummary(data); setSessionEnded(true); }
-      else { setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try chatting first!", sender: 'bot' }]); }
-    } catch (e) { console.error('Summary error:', e); }
+    if (messages.length <= 1) {
+      setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try chatting first!", sender: 'bot' }]);
+      return;
+    }
+    // Navigate to summary page for the current session
+    setCurrentPage('summary');
+    // Start a fresh session so going back to chat is a new conversation
+    sessionIdRef.current = 'session_' + Date.now();
+    setMessages([]);
+    setSessionEnded(false);
+    showWelcome();
   };
 
   const sendMessage = () => {
@@ -188,12 +186,14 @@ function App() {
   const handleMentalStateClick = () => setCurrentPage('mental-state');
   const handleHistoryClick     = () => setCurrentPage('history');
   const handleFAQsClick        = () => setCurrentPage('faqs');
+  const handleSummaryClick     = () => setCurrentPage('summary');
 
   const navProps = {
     onHomeClick: handleHomeClick,
     onMentalStateClick: handleMentalStateClick,
     onHistoryClick: handleHistoryClick,
     onFAQsClick: handleFAQsClick,
+    onSummaryClick: handleSummaryClick,
     user, onLogout: handleLogout, onNewChat: handleNewChat,
   };
 
@@ -205,6 +205,9 @@ function App() {
   }
   if (currentPage === 'history') {
     return <HistoryPage onBack={handleHomeClick} {...navProps} onContinueConversation={handleContinueConversation} />;
+  }
+  if (currentPage === 'summary') {
+    return <SessionSummaryPage onBack={handleHomeClick} {...navProps} />;
   }
   if (currentPage === 'faqs') {
     return <FAQsPage onBack={handleHomeClick} {...navProps} />;
@@ -228,7 +231,7 @@ function App() {
 
         {/* End Session */}
         {!sessionEnded && messages.length > 1 && (
-          <div className="absolute top-4 right-4 z-20">
+          <div className="relative z-20 flex justify-end p-4 pb-0 shrink-0">
             <button onClick={handleEndSession}
               className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-200 text-sm hover:bg-purple-600/50 transition-all">
               End Session
@@ -252,12 +255,6 @@ function App() {
               </div>
             </div>
           ))}
-
-          {sessionSummary && (
-            <div className="flex justify-center">
-              <SessionSummary summary={sessionSummary} onNewSession={handleNewChat} />
-            </div>
-          )}
 
           {isTyping && (
             <div className="flex justify-start">

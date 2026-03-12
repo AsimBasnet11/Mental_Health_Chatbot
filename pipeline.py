@@ -68,25 +68,28 @@ def process_user_input(user_message, conversation_history):
     # Step 1: Input Gate
     gate_result = check_input(user_message)
 
+    # Step 2: Emotion Detection — ALWAYS run so Mental State page has data
+    emotion, emotion_score = detect_emotion(user_message)
+
+    # Step 3: Mental Health Classification — ALWAYS run
+    category, category_score, all_scores = classify_mental_health_with_scores(user_message)
+
     if gate_result["status"] != "proceed":
-        # For non-proceed statuses, still store in history for completeness
-        conversation_history.add_user_message(user_message)
+        # Non-proceed: still store detection results but use gate response
+        conversation_history.add_user_message(
+            user_message, emotion, emotion_score, category, category_score
+        )
         conversation_history.add_assistant_message(gate_result["response"])
         return {
             "response": gate_result["response"],
-            "emotion": None,
-            "emotion_score": None,
-            "category": None,
-            "category_score": None,
+            "emotion": emotion,
+            "emotion_score": emotion_score,
+            "category": category,
+            "category_score": category_score,
+            "all_scores": all_scores,
             "show_analysis": False,
             "gate_status": gate_result["status"]
         }
-
-    # Step 2: Emotion Detection
-    emotion, emotion_score = detect_emotion(user_message)
-
-    # Step 3: Mental Health Classification (with all scores for DB storage)
-    category, category_score, all_scores = classify_mental_health_with_scores(user_message)
 
     # Step 4: Store in conversation history
     conversation_history.add_user_message(

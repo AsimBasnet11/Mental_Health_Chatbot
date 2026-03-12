@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaMicrophone, FaRedo, FaBrain, FaWifi, FaPlug, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 import Sidebar from './Sidebar';
-import SessionSummary from './SessionSummary';
 
 const DEFAULT_WS_URL = localStorage.getItem('asr_ws_url') || "";
 const API_BASE = "http://localhost:8000";
@@ -9,7 +8,7 @@ const API_BASE = "http://localhost:8000";
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
 
-const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, user, onLogout, onNewChat, currentSessionId }) => {
+const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, user, onLogout, onNewChat, currentSessionId }) => {
   const [isListening, setIsListening] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
   const [messages, setMessages] = useState([]);
@@ -19,7 +18,6 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const [isTyping, setIsTyping] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [wsUrl, setWsUrl] = useState(DEFAULT_WS_URL);
-  const [sessionSummary, setSessionSummary] = useState(null);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -517,7 +515,6 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     isWaitingForFlushRef.current = false;
     hasProcessedRef.current = false;
     setIsStopping(false);
-    setSessionSummary(null);
     setSessionEnded(false);
     
     if (flushTimeoutRef.current) {
@@ -536,15 +533,12 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
   // End Session — same as chat page
   const handleEndSession = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/summary`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ session_id: currentSessionId })
-      });
-      const data = await res.json();
-      if (data.message_count > 0) { setSessionSummary(data); setSessionEnded(true); }
-      else { setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try speaking first!", isUser: false }]); }
-    } catch (e) { console.error('Summary error:', e); }
+    if (messages.length <= 1) {
+      setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try speaking first!", isUser: false }]);
+      return;
+    }
+    setSessionEnded(true);
+    onSummaryClick();
   };
 
   // Cleanup on unmount
@@ -574,6 +568,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick}
         onFAQsClick={onFAQsClick}
+        onSummaryClick={onSummaryClick}
         currentPage="voice"
         user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
@@ -596,71 +591,62 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           ))}
         </div>
 
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-          <input
-            type="text"
-            value={wsUrl}
-            onChange={(e) => setWsUrl(e.target.value)}
-            placeholder="wss://your-ngrok-url.ngrok-free.dev"
-            disabled={isConnected || isListening}
-            className="px-3 py-2 rounded-full text-sm bg-[#1a1035]/80 border border-purple-500/30 text-white placeholder-purple-300/40 backdrop-blur-md w-72 focus:outline-none focus:border-purple-400 disabled:opacity-50"
-          />
-          <button
-            onClick={handleServerToggle}
-            disabled={isListening}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all shadow-xl
-              ${isConnected 
-                ? 'bg-green-600/80 hover:bg-green-700/80 border-2 border-green-400' 
-                : 'bg-gray-600/80 hover:bg-gray-700/80 border-2 border-gray-400'
-              }
-              ${isListening ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-              backdrop-blur-md`}
-          >
-            {isConnected ? (
-              <>
-                <FaWifi className="text-white animate-pulse" />
-                <span className="text-sm font-bold text-white">Connected</span>
-                <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
-              </>
-            ) : (
-              <>
-                <FaPlug className="text-white" />
-                <span className="text-sm font-bold text-white">Connect Server</span>
-                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-              </>
+        {/* Top bar: Connect + TTS + End Session */}
+        <div className="relative z-20 flex items-center justify-between p-4 pb-0 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleServerToggle}
+              disabled={isListening}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all shadow-xl
+                ${isConnected 
+                  ? 'bg-green-600/80 hover:bg-green-700/80 border-2 border-green-400' 
+                  : 'bg-gray-600/80 hover:bg-gray-700/80 border-2 border-gray-400'
+                }
+                ${isListening ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                backdrop-blur-md`}
+            >
+              {isConnected ? (
+                <>
+                  <FaWifi className="text-white animate-pulse" />
+                  <span className="text-sm font-bold text-white">Connected</span>
+                  <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
+                </>
+              ) : (
+                <>
+                  <FaPlug className="text-white" />
+                  <span className="text-sm font-bold text-white">Connect Server</span>
+                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                </>
+              )}
+            </button>
+            {isListening && (
+              <span className="text-xs text-yellow-400">Stop recording first</span>
             )}
-          </button>
-          {isListening && (
-            <div className="mt-1 text-xs text-yellow-400 text-center">
-              Stop recording first
-            </div>
-          )}
 
-          {/* TTS Toggle */}
-          <button
-            onClick={() => { setTtsEnabled(prev => { if (prev) window.speechSynthesis.cancel(); return !prev; }); setIsSpeaking(false); }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
-              ${ttsEnabled
-                ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'
-                : 'bg-gray-600/40 border-gray-500/30 text-gray-400'}`}
-            title={ttsEnabled ? 'Mute voice responses' : 'Unmute voice responses'}
-          >
-            {ttsEnabled ? <FaVolumeUp className="text-sm" /> : <FaVolumeMute className="text-sm" />}
-            <span className="text-xs font-medium">{ttsEnabled ? 'TTS On' : 'TTS Off'}</span>
-          </button>
-        </div>
+            {/* TTS Toggle */}
+            <button
+              onClick={() => { setTtsEnabled(prev => { if (prev) window.speechSynthesis.cancel(); return !prev; }); setIsSpeaking(false); }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
+                ${ttsEnabled
+                  ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'
+                  : 'bg-gray-600/40 border-gray-500/30 text-gray-400'}`}
+              title={ttsEnabled ? 'Mute voice responses' : 'Unmute voice responses'}
+            >
+              {ttsEnabled ? <FaVolumeUp className="text-sm" /> : <FaVolumeMute className="text-sm" />}
+              <span className="text-xs font-medium">{ttsEnabled ? 'TTS On' : 'TTS Off'}</span>
+            </button>
+          </div>
 
-        {/* End Session */}
-        {!sessionEnded && messages.length > 1 && (
-          <div className="absolute top-4 right-4 z-20">
+          {/* End Session */}
+          {!sessionEnded && messages.length > 1 && (
             <button onClick={handleEndSession}
               className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-200 text-sm hover:bg-purple-600/50 transition-all">
               End Session
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 mt-20">
+        <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10">
           {messages.map((msg, index) => (
             <div 
               key={index} 
@@ -680,12 +666,6 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               </div>
             </div>
           ))}
-
-          {sessionSummary && (
-            <div className="flex justify-center">
-              <SessionSummary summary={sessionSummary} onNewSession={handleRefresh} />
-            </div>
-          )}
 
           {isListening && (
             <div className="flex justify-end">
@@ -778,7 +758,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           <div className="mt-4 text-xs text-purple-300/60 text-center px-4">
             {!isConnected && (
-              <div className="text-yellow-400 mb-2 font-bold">Paste the Colab WSS URL above and click "Connect Server" to enable voice recording.</div>
+              <div className="text-yellow-400 mb-2 font-bold">Click "Connect Server" to enable voice recording.</div>
             )}
             {isConnected && (
               <div className="text-green-400 mb-2">Server connected — you can record multiple times.</div>
