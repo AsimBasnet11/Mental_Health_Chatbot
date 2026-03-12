@@ -1,0 +1,57 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Model files (large binary — top-level only)
+*.gguf
+
+# Keep Detection model weights tracked
+# Detection/**/*.bin
+# Detection/**/*.safetensors
+# Detection/**/*.pt
+
+# Sentence-transformers cache
+.cache/
+sentence-transformers/
+
+# PDF documentation (large binary)
+*.pdf
+
+# Node / React
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+ehthumbs.db
+
+# Logs
+*.log
+
+# Temp files
+_read_pdf.py
+
+# Jupyter
+.ipynb_checkpoints/
+# Keep ASR Colab notebook tracked
+# *.ipynb
+
+# Environment variables
+.env
+.env.*
