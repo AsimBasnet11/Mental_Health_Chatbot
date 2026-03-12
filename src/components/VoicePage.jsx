@@ -1,19 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaMicrophone, FaRedo, FaBrain, FaWifi, FaPlug } from 'react-icons/fa';
+import { FaMicrophone, FaRedo, FaBrain, FaWifi, FaPlug, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 import Sidebar from './Sidebar';
+import SessionSummary from './SessionSummary';
 
 const DEFAULT_WS_URL = localStorage.getItem('asr_ws_url') || "";
 const API_BASE = "http://localhost:8000";
 
-const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick }) => {
+function getToken() { return localStorage.getItem('token'); }
+function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
+
+const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, user, onLogout, onNewChat, currentSessionId }) => {
   const [isListening, setIsListening] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
   const [messages, setMessages] = useState([]);
   const [dotCount, setDotCount] = useState(1);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [wsUrl, setWsUrl] = useState(DEFAULT_WS_URL);
+  const [sessionSummary, setSessionSummary] = useState(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   
   // Connection status state
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -60,10 +69,10 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       setPermissionGranted(true);
-      console.log('✅ Microphone permission granted');
+      console.log('[Mic] Permission granted');
       return true;
     } catch (err) {
-      console.error('Microphone permission denied:', err);
+      console.error('[Mic] Permission denied:', err);
       alert('Microphone permission is required!');
       return false;
     }
@@ -78,82 +87,91 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       .join(' ');
   };
 
-  // Analyze text with API
+  // Text-to-Speech — reads bot response aloud
+  const speakResponse = (text) => {
+    if (!ttsEnabled || !text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    // Prefer a female English voice for warmth
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
+      || voices.find(v => v.lang.startsWith('en-') && !v.name.toLowerCase().includes('male'))
+      || voices.find(v => v.lang.startsWith('en'));
+    if (preferred) utterance.voice = preferred;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Analyze text with full pipeline (same as chat page)
   const analyzeText = async (text) => {
     if (!text.trim()) {
-      console.log('⚠️ No text to analyze');
+      console.log('[Voice] No text to analyze');
       return;
     }
 
-    console.log('🧠 Starting analysis:', text.length, 'chars');
+    console.log('[Voice] Starting pipeline:', text.length, 'chars');
     setIsAnalyzing(true);
+    setIsTyping(true);
     
+    // Show placeholder bot message while processing
     setMessages(prev => [...prev, { 
-      text: "Voice received. Analyzing your message...", 
+      text: "Analyzing your message...", 
       isUser: false 
     }]);
     
     try {
-      const res = await fetch(`${API_BASE}/analyze`, {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ message: text, session_id: currentSessionId })
       });
       
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }
       
-      const data = await res.json();
-      console.log('✅ Analysis complete:', data.emotion?.label, '/', data.mental_state?.label);
-      
-      const analysisData = {
-         timestamp: new Date().toISOString(),
-          userText: text,
-          emotion: {
-            label: formatLabel(data.emotion?.label || 'unknown'),
-            confidence: ((data.emotion?.confidence || 0) * 100).toFixed(1),
-            rawLabel: data.emotion?.label || 'unknown',
-            rawScore: data.emotion?.confidence || 0
-          },
-       mentalHealth: {
-            label: formatLabel(data.mental_state?.label || 'unknown'),
-            confidence: ((data.mental_state?.confidence || 0) * 100).toFixed(1),
-            rawLabel: data.mental_state?.label || 'unknown',
-            rawScore: data.mental_state?.confidence || 0
-         }
-      };;
-      
-      localStorage.setItem('latestAnalysis', JSON.stringify(analysisData));
-      
-      const history = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
-      history.push(analysisData);
-      if (history.length > 10) history.shift();
-      localStorage.setItem('analysisHistory', JSON.stringify(history));
-      
-      setTimeout(() => {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1] = {
-            text: "Analysis complete! Click 'Mental State' in sidebar to see detailed results.",
-            isUser: false
-          };
-          return newMessages;
-        });
-      }, 500);
-      
-    } catch (e) {
-      console.error('❌ Analysis failed:', e);
+      const chatData = await res.json();
+      console.log('[Voice] Pipeline complete:', chatData.emotion, '/', chatData.category);
+
+      setIsAnalyzing(false);
+      setIsTyping(false);
+
+      // Build analysis tags (same format as chat page)
+      const emotionTag = chatData.emotion ? `🎭 ${formatLabel(chatData.emotion)} (${Math.round((chatData.emotion_score || 0) * 100)}%)` : '';
+      const categoryTag = chatData.category ? `🧠 ${formatLabel(chatData.category)} (${Math.round((chatData.category_score || 0) * 100)}%)` : '';
+      const tags = [emotionTag, categoryTag].filter(Boolean).join('  ·  ');
+
+      // Replace placeholder with actual AI response
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
-          text: "I'm having trouble analyzing right now. But I'm still here to listen.",
+          text: chatData.response,
+          isUser: false,
+          tags: chatData.show_analysis ? tags : null
+        };
+        return newMessages;
+      });
+
+      // Speak the response aloud
+      speakResponse(chatData.response);
+      
+    } catch (e) {
+      console.error('[Voice] Pipeline failed:', e);
+      setIsAnalyzing(false);
+      setIsTyping(false);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          text: "I'm having trouble responding right now. But I'm still here to listen.",
           isUser: false
         };
         return newMessages;
       });
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -174,18 +192,18 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const processFinalMessage = () => {
     // Prevent double processing
     if (hasProcessedRef.current) {
-      console.log('⚠️ Already processed, skipping');
+      console.log('[Voice] Already processed, skipping');
       return;
     }
     
     hasProcessedRef.current = true;
-    console.log('📝 Processing final message...');
+    console.log('[Voice] Processing final message...');
     
     // Cancel timeout if it exists
     if (flushTimeoutRef.current) {
       clearTimeout(flushTimeoutRef.current);
       flushTimeoutRef.current = null;
-      console.log('✅ Cancelled timeout');
+      console.log('[Voice] Cancelled timeout');
     }
     
     let finalText = '';
@@ -193,23 +211,23 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     // Priority 1: Accumulated text (best)
     if (accumulatedTextRef.current.trim()) {
       finalText = accumulatedTextRef.current.trim();
-      console.log('✅ Using accumulated text:', finalText.length, 'chars');
+      console.log('[Voice] Using accumulated text:', finalText.length, 'chars');
     }
     // Priority 2: Current partial (fallback)
     else if (currentPartialRef.current.trim()) {
       finalText = currentPartialRef.current.trim();
-      console.log('⚠️ Using partial as fallback:', finalText.length, 'chars');
+      console.log('[Voice] Using partial as fallback:', finalText.length, 'chars');
     }
     // Priority 3: UI state (last resort)
     else if (partialTranscript.trim()) {
       finalText = partialTranscript.trim();
-      console.log('⚠️ Using UI partial as fallback:', finalText.length, 'chars');
+      console.log('[Voice] Using UI partial as fallback:', finalText.length, 'chars');
     }
     
-    console.log('📊 Final text length:', finalText.length, 'characters');
+    console.log('[Voice] Final text length:', finalText.length, 'characters');
     
     if (finalText) {
-      console.log('✅ Sending user message');
+      console.log('[Voice] Sending user message');
       
       setMessages(prev => [...prev, { 
         text: finalText, 
@@ -218,7 +236,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       
       analyzeText(finalText);
     } else {
-      console.log('❌ NO TEXT CAPTURED!');
+      console.log('[Voice] No text captured');
       alert('No speech detected. Please try speaking again.');
     }
     
@@ -229,14 +247,14 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     isWaitingForFlushRef.current = false;
     setIsStopping(false);
     
-    // ⭐ DON'T CLOSE WEBSOCKET - Keep it connected for next recording!
-    console.log('✅ Ready for next recording (server still connected)');
+    // Keep WebSocket open for next recording
+    console.log('[Voice] Ready for next recording');
   };
 
   // Connect to ASR WebSocket
   const connectToServer = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('ℹ️ Already connected');
+      console.log('[WS] Already connected');
       return;
     }
 
@@ -254,14 +272,14 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     // Save for next session
     localStorage.setItem('asr_ws_url', wsUrl.trim());
 
-    console.log('🔌 Connecting to server...');
+    console.log('[WS] Connecting to server...');
     setConnectionStatus('connecting');
     
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
 
     ws.onopen = () => {
-      console.log('✅ WebSocket connected');
+      console.log('[WS] Connected');
       setConnectionStatus('connected');
       setIsConnected(true);
     };
@@ -298,10 +316,9 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
             
             // If we're waiting for flush and got final, process it
             if (isWaitingForFlushRef.current && !hasProcessedRef.current) {
-              console.log('✅ Got final after flush! Processing in 500ms...');
+              console.log('[Voice] Got final after flush, processing...');
               setTimeout(() => {
                 processFinalMessage();
-                // ⭐ DON'T CLOSE - Server stays connected!
               }, 500);
             }
           }
@@ -323,7 +340,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     };
     
     ws.onclose = () => {
-      console.log('🔌 WebSocket closed');
+      console.log('[WS] Closed');
       setConnectionStatus('disconnected');
       setIsConnected(false);
       wsRef.current = null;
@@ -339,7 +356,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     }
     
     if (wsRef.current) {
-      console.log('🔌 Disconnecting from server...');
+      console.log('[WS] Disconnecting...');
       try {
         wsRef.current.send(JSON.stringify({ cmd: "close" }));
       } catch (e) {
@@ -365,7 +382,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const startRecording = async () => {
     if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       alert('Please connect to server first (click green connect button)!');
-      console.log('❌ Cannot record: Not connected to server');
+      console.log('[Voice] Cannot record: not connected');
       return;
     }
 
@@ -385,7 +402,11 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       flushTimeoutRef.current = null;
     }
     
-    console.log('🎤 Starting new recording - all buffers reset');
+    // Cancel any ongoing TTS so mic doesn't pick up bot voice
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+    
+    console.log('[Voice] Starting new recording');
 
     if (!audioContextRef.current || audioContextRef.current.state === "closed") {
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ 
@@ -419,7 +440,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
       processorRef.current = processor;
       setIsListening(true);
-      console.log('🎤 Recording started');
+      console.log('[Voice] Recording started');
     } catch (err) {
       console.error('Error starting recording:', err);
       alert('Failed to start recording. Please check microphone permissions.');
@@ -428,7 +449,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
   // Stop Recording - WITH FLUSH but DON'T close server!
   const stopRecording = () => {
-    console.log('🛑 Stopping recording...');
+    console.log('[Voice] Stopping recording...');
     setIsStopping(true);
     
     // Stop audio processing
@@ -447,31 +468,30 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
     // SEND FLUSH COMMAND
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('📤 Sending flush command...');
+      console.log('[Voice] Sending flush...');
       isWaitingForFlushRef.current = true;
       
       try {
         wsRef.current.send(JSON.stringify({ cmd: "flush" }));
-        console.log('✅ Flush command sent');
+        console.log('[Voice] Flush sent');
       } catch (e) {
-        console.error('❌ Failed to send flush:', e);
+        console.error('[Voice] Flush failed:', e);
       }
       
       // Set timeout - only process if we haven't already
       flushTimeoutRef.current = setTimeout(() => {
-        console.log('⏰ Flush timeout reached (3s)');
+        console.log('[Voice] Flush timeout (3s)');
         
         if (!hasProcessedRef.current) {
-          console.log('⚠️ No final received after flush, processing what we have...');
+          console.log('[Voice] No final after flush, processing available text');
           processFinalMessage();
-          // ⭐ DON'T CLOSE - Server stays connected for next recording!
         } else {
-          console.log('✅ Already processed, timeout skipped');
+          console.log('[Voice] Already processed, timeout skipped');
         }
       }, 3000);
     } else {
       // No WebSocket connection, process immediately
-      console.log('⚠️ No WebSocket, processing immediately');
+      console.log('[Voice] No WebSocket, processing immediately');
       processFinalMessage();
     }
   };
@@ -497,22 +517,40 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     isWaitingForFlushRef.current = false;
     hasProcessedRef.current = false;
     setIsStopping(false);
+    setSessionSummary(null);
+    setSessionEnded(false);
     
     if (flushTimeoutRef.current) {
       clearTimeout(flushTimeoutRef.current);
       flushTimeoutRef.current = null;
     }
     
-    console.log('🔄 Chat refreshed');
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+    console.log('[Voice] Chat refreshed');
     
     if (isListening) {
       stopRecording();
     }
   };
 
+  // End Session — same as chat page
+  const handleEndSession = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/summary`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ session_id: currentSessionId })
+      });
+      const data = await res.json();
+      if (data.message_count > 0) { setSessionSummary(data); setSessionEnded(true); }
+      else { setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try speaking first!", isUser: false }]); }
+    } catch (e) { console.error('Summary error:', e); }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      window.speechSynthesis.cancel();
       if (isListening) {
         stopRecording();
       }
@@ -537,6 +575,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         onHistoryClick={onHistoryClick}
         onFAQsClick={onFAQsClick}
         currentPage="voice"
+        user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
 
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
@@ -596,7 +635,30 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               Stop recording first
             </div>
           )}
+
+          {/* TTS Toggle */}
+          <button
+            onClick={() => { setTtsEnabled(prev => { if (prev) window.speechSynthesis.cancel(); return !prev; }); setIsSpeaking(false); }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
+              ${ttsEnabled
+                ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'
+                : 'bg-gray-600/40 border-gray-500/30 text-gray-400'}`}
+            title={ttsEnabled ? 'Mute voice responses' : 'Unmute voice responses'}
+          >
+            {ttsEnabled ? <FaVolumeUp className="text-sm" /> : <FaVolumeMute className="text-sm" />}
+            <span className="text-xs font-medium">{ttsEnabled ? 'TTS On' : 'TTS Off'}</span>
+          </button>
         </div>
+
+        {/* End Session */}
+        {!sessionEnded && messages.length > 1 && (
+          <div className="absolute top-4 right-4 z-20">
+            <button onClick={handleEndSession}
+              className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-200 text-sm hover:bg-purple-600/50 transition-all">
+              End Session
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 mt-20">
           {messages.map((msg, index) => (
@@ -605,13 +667,25 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
             >
               <div 
-                className="inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words bg-[#1a1035]/60 border border-purple-500/20 text-purple-200 whitespace-pre-line"
+                className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line
+                  ${msg.isUser
+                    ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
+                    : 'bg-[#1a1035]/60 border border-purple-500/20 text-purple-200 animate-slideUp'}`}
                 style={{ maxWidth: '70%' }}
               >
                 {msg.text}
+                {msg.tags && (
+                  <div className="mt-2 pt-2 border-t border-purple-500/20 text-xs text-purple-400/70">{msg.tags}</div>
+                )}
               </div>
             </div>
           ))}
+
+          {sessionSummary && (
+            <div className="flex justify-center">
+              <SessionSummary summary={sessionSummary} onNewSession={handleRefresh} />
+            </div>
+          )}
 
           {isListening && (
             <div className="flex justify-end">
@@ -640,9 +714,26 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 text-purple-200">
-                <FaBrain className="animate-pulse mr-2" />
-                Analyzing in background...
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-purple-300 mr-2">Analyzing emotions</span>
+                <div className="flex items-center space-x-1">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-400"></span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isTyping && !isAnalyzing && (
+            <div className="flex justify-start">
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-purple-300 mr-2">Bot is typing</span>
+                <div className="flex items-center space-x-1">
+                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce"></span>
+                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-400"></span>
+                </div>
               </div>
             </div>
           )}
@@ -687,10 +778,13 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           <div className="mt-4 text-xs text-purple-300/60 text-center px-4">
             {!isConnected && (
-              <div className="text-yellow-400 mb-2 font-bold">⚠️ Paste the Colab WSS URL above and click "Connect Server" to enable voice recording!</div>
+              <div className="text-yellow-400 mb-2 font-bold">Paste the Colab WSS URL above and click "Connect Server" to enable voice recording.</div>
             )}
             {isConnected && (
-              <div className="text-green-400 mb-2">✅ Server connected - You can record multiple times!</div>
+              <div className="text-green-400 mb-2">Server connected — you can record multiple times.</div>
+            )}
+            {isSpeaking && (
+              <div className="text-purple-300 mb-1 animate-pulse">Speaking...</div>
             )}
             This is an AI assistant for emotional support. For crisis situations, please contact emergency services or a mental health professional.
           </div>

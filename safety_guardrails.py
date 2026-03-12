@@ -13,6 +13,23 @@ DIAGNOSIS_PHRASES = [
     "i diagnose you", "you clearly have"
 ]
 
+# Medication / drug names the LLM should never recommend
+_MEDICATION_PATTERN = re.compile(
+    r"\b(take|prescribe|recommend|try|suggest)\b.{0,30}"
+    r"\b(xanax|prozac|zoloft|lexapro|valium|adderall|ritalin"
+    r"|sertraline|fluoxetine|citalopram|escitalopram|alprazolam"
+    r"|diazepam|lorazepam|clonazepam|bupropion|venlafaxine"
+    r"|duloxetine|lithium|quetiapine|aripiprazole|medication|meds|pills)\b",
+    re.IGNORECASE,
+)
+
+# Hallucination / role-break phrases to strip
+_HALLUCINATION_PHRASES = [
+    "as an ai", "as a language model", "i'm just a chatbot",
+    "i cannot provide medical", "i'm not a real therapist",
+    "as an artificial intelligence",
+]
+
 PROFESSIONAL_HELP_SUGGESTION = (
     "I'd encourage you to speak with a licensed mental health professional "
     "who can provide a proper assessment and personalized support."
@@ -28,14 +45,24 @@ SAFE_CLOSING = (
     "can provide additional support."
 )
 
+CRISIS_RESOURCES = (
+    "If you're in immediate danger, please call 988 (Suicide & Crisis Lifeline) "
+    "or text HOME to 741741 (Crisis Text Line). You are not alone."
+)
 
-def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0):
+# Hard cap so the bot doesn't ramble
+_MAX_RESPONSE_WORDS = 120
+
+
+def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
+                            category=None):
     """Apply safety rules to the LLM response.
 
     Args:
         response: The raw LLM response text.
         emotion_score: Emotion detection confidence (0.0 - 1.0).
         category_score: Mental health classification confidence (0.0 - 1.0).
+        category: Mental health classification label (e.g. 'Suicidal').
 
     Returns:
         The sanitized response text.
@@ -57,19 +84,42 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0):
 
     response = " ".join(filtered_sentences)
 
-    # Rule 2 — Low Confidence Handler
+    # Rule 2 — No Medication Recommendations
+    if _MEDICATION_PATTERN.search(response):
+        response = _MEDICATION_PATTERN.sub(
+            "speaking with a doctor about treatment options", response
+        )
+
+    # Rule 3 — Strip hallucination / role-break sentences
+    for phrase in _HALLUCINATION_PHRASES:
+        if phrase in response.lower():
+            parts = re.split(r'(?<=[.!?])\s+', response)
+            parts = [s for s in parts if phrase not in s.lower()]
+            response = " ".join(parts)
+
+    # Rule 4 — Low Confidence Handler
     if emotion_score < 0.5 or category_score < 0.5:
         response = response.rstrip() + " " + LOW_CONFIDENCE_FOLLOWUP
 
-    # Rule 3 — Response Too Short (less than 20 words)
+    # Rule 5 — Response Too Short (less than 20 words)
     if len(response.split()) < 20:
         response = response.rstrip()
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"
 
-    # Rule 4 — Always Safe Closing for high-confidence categories
+    # Rule 6 — Response Too Long — trim to _MAX_RESPONSE_WORDS
+    words = response.split()
+    if len(words) > _MAX_RESPONSE_WORDS:
+        response = " ".join(words[:_MAX_RESPONSE_WORDS]).rstrip(".,;: ") + "."
+
+    # Rule 7 — Always Safe Closing for high-confidence categories
     if category_score > 0.85:
         if SAFE_CLOSING.lower() not in response.lower():
             response = response.rstrip() + " " + SAFE_CLOSING
+
+    # Rule 8 — Inject crisis resources for Suicidal category
+    if category and category.lower() == "suicidal" and category_score >= 0.5:
+        if "988" not in response:
+            response = response.rstrip() + " " + CRISIS_RESOURCES
 
     return response

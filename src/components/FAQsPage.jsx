@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaQuestionCircle, FaArrowLeft, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
-const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick }) => {
+const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, user, onLogout, onNewChat }) => {
   const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
@@ -61,6 +61,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         onHistoryClick={onHistoryClick}
         onFAQsClick={onFAQsClick}
         currentPage="faqs"
+        user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
 
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">

@@ -6,10 +6,13 @@ from the Detection/ folder and provides inference functions for the pipeline.
 
 import re
 import os
+import logging
 import numpy as np
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+log = logging.getLogger("mindcare.detection")
 
 # ── Device ───────────────────────────────────────────────────
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,24 +48,24 @@ _emotion_model = None
 def _load_sentiment_model():
     global _sentiment_tokenizer, _sentiment_model
     if _sentiment_model is None:
-        print(f"[DETECTION] Loading sentiment model from {SENTIMENT_MODEL_PATH}...")
+        log.info("Loading sentiment model from %s...", SENTIMENT_MODEL_PATH)
         _sentiment_tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL_PATH)
         _sentiment_model = AutoModelForSequenceClassification.from_pretrained(
             SENTIMENT_MODEL_PATH
         ).to(device).eval()
-        print(f"[DETECTION] Sentiment model loaded on {device}")
+        log.info("Sentiment model loaded on %s", device)
     return _sentiment_tokenizer, _sentiment_model
 
 
 def _load_emotion_model():
     global _emotion_tokenizer, _emotion_model
     if _emotion_model is None:
-        print(f"[DETECTION] Loading emotion model from {EMOTION_MODEL_PATH}...")
+        log.info("Loading emotion model from %s...", EMOTION_MODEL_PATH)
         _emotion_tokenizer = AutoTokenizer.from_pretrained(EMOTION_MODEL_PATH)
         _emotion_model = AutoModelForSequenceClassification.from_pretrained(
             EMOTION_MODEL_PATH
         ).to(device).eval()
-        print(f"[DETECTION] Emotion model loaded on {device}")
+        log.info("Emotion model loaded on %s", device)
     return _emotion_tokenizer, _emotion_model
 
 
@@ -170,6 +173,23 @@ def classify_mental_health(text):
     probs = _infer_best_chunk(cleaned, tokenizer, model)
     top_idx = int(np.argmax(probs))
     return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]))
+
+
+def classify_mental_health_with_scores(text):
+    """Classify mental health and also return all label scores.
+
+    Returns:
+        (category_label: str, confidence: float, all_scores: dict)
+    """
+    tokenizer, model = _load_sentiment_model()
+    cleaned = clean(text)
+    if not cleaned:
+        return ("Normal", 0.5, {})
+
+    probs = _infer_best_chunk(cleaned, tokenizer, model)
+    top_idx = int(np.argmax(probs))
+    all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(probs)}
+    return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]), all_scores)
 
 
 def analyze_full(text):

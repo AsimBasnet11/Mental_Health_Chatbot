@@ -2,20 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Main gradient background */
+/* Reset */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+#root {
+  height: 100%;
+}
 body {
   @apply bg-gradient-to-br from-[#0a0515] via-[#1a1035] to-[#1e1a3d] text-white;
 }
-/* Floating glass animation */
+
+/* Floating animation */
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
+  0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
 }
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
 
-/* Icon shimmer/twinkle animation */
+/* Icon shimmer/twinkle */
 @keyframes twinkle {
   0%, 100% { opacity: 0.7; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.1); }
@@ -24,7 +34,7 @@ body {
   animation: twinkle 2s ease-in-out infinite;
 }
 
-/* Logo glow animation */
+/* Logo glow */
 @keyframes logoGlow {
   0%, 100% { filter: drop-shadow(0 0 4px #9b59b6); }
   50% { filter: drop-shadow(0 0 12px #d19bf6); }
@@ -33,32 +43,14 @@ body {
   animation: logoGlow 2.5s ease-in-out infinite;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-.animate-float { animation: float 3s ease-in-out infinite; }
-
+/* Fade in */
 @keyframes fadeIn {
   0% { opacity: 0; transform: translateY(10px); }
   100% { opacity: 1; transform: translateY(0); }
 }
-.animate-fadeIn { animation: fadeIn 0.4s ease-out; }
-
-
-/* Floating animation for sidebar/logo if needed */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out;
 }
-.animate-float { animation: float 3s ease-in-out infinite; }
-
-/* Message fade-in */
-@keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeIn { animation: fadeIn 0.4s ease-out; }
 
 /* Typing dots bounce */
 @keyframes bounce {
@@ -71,41 +63,11 @@ body {
 .animate-bounce.delay-200 { animation-delay: 0.2s; }
 .animate-bounce.delay-400 { animation-delay: 0.4s; }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-.animate-float { animation: float 3s ease-in-out infinite; }
-
-@keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeIn { animation: fadeIn 0.4s ease-out; }
-
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
-}
-.animate-bounce {
-  animation: bounce 1s infinite;
-}
-.animate-bounce.delay-200 { animation-delay: 0.2s; }
-.animate-bounce.delay-400 { animation-delay: 0.4s; }
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
+/* Slide up */
 @keyframes slideUp {
   0% { transform: translateY(30px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
-
 .animate-slideUp {
   animation: slideUp 0.5s ease-out forwards;
 }

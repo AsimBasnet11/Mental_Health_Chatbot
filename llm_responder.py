@@ -9,8 +9,11 @@ Supports two modes:
 
 import os
 import json
+import logging
 import urllib.request
 import urllib.error
+
+log = logging.getLogger("mindcare.llm")
 
 
 class LLMResponder:
@@ -29,7 +32,7 @@ class LLMResponder:
         if self.remote_url:
             # Remote mode — LLM runs on Colab
             self.remote_url = self.remote_url.rstrip("/")
-            print(f"[LLM] Remote mode — using Colab API at {self.remote_url}")
+            log.info("Remote mode — using Colab API at %s", self.remote_url)
         else:
             # Local mode — load model into memory
             if model_path is None:
@@ -45,15 +48,15 @@ class LLMResponder:
                     "  2. Place Counselor_Llama3_Q4.gguf in the project directory."
                 )
 
-            from llama_cpp import Llama
-            print(f"[LLM] Local mode — loading {model_path}...")
+            from llama_cpp import Llama  # type: ignore[reportMissingImports]
+            log.info("Local mode — loading %s...", model_path)
             self.llm = Llama(
                 model_path=model_path,
                 n_ctx=2048,
                 n_gpu_layers=-1,
                 verbose=False
             )
-            print("[LLM] Model loaded locally.")
+            log.info("Model loaded locally.")
 
     def generate_response(self, prompt):
         """Generate a therapist-like response from the prompt."""
@@ -94,8 +97,8 @@ class LLMResponder:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data.get("response", "").strip()
         except urllib.error.URLError as e:
-            print(f"[LLM] Remote API error: {e}")
+            log.error("Remote API error: %s", e)
             return "I'm having trouble connecting to the language model right now. Please try again in a moment."
         except Exception as e:
-            print(f"[LLM] Unexpected error: {e}")
+            log.error("Unexpected error: %s", e)
             return "I'm sorry, something went wrong. Please try again."

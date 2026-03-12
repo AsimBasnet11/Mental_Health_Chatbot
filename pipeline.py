@@ -19,7 +19,7 @@ from prompt_builder import build_prompt
 from safety_guardrails import apply_safety_guardrails
 from conversation_history import ConversationHistory
 from session_summary import generate_session_summary
-from detection import detect_emotion, classify_mental_health
+from detection import detect_emotion, classify_mental_health, classify_mental_health_with_scores
 
 # These are loaded lazily to avoid slow imports at module level
 _rag_search = None
@@ -85,8 +85,8 @@ def process_user_input(user_message, conversation_history):
     # Step 2: Emotion Detection
     emotion, emotion_score = detect_emotion(user_message)
 
-    # Step 3: Mental Health Classification
-    category, category_score = classify_mental_health(user_message)
+    # Step 3: Mental Health Classification (with all scores for DB storage)
+    category, category_score, all_scores = classify_mental_health_with_scores(user_message)
 
     # Step 4: Store in conversation history
     conversation_history.add_user_message(
@@ -109,7 +109,8 @@ def process_user_input(user_message, conversation_history):
     response = llm.generate_response(prompt)
 
     # Step 8: Safety Guardrails
-    response = apply_safety_guardrails(response, emotion_score, category_score)
+    response = apply_safety_guardrails(response, emotion_score, category_score,
+                                       category=category)
 
     # Step 9: Store AI response in history
     conversation_history.add_assistant_message(response)
@@ -120,6 +121,7 @@ def process_user_input(user_message, conversation_history):
         "emotion_score": emotion_score,
         "category": category,
         "category_score": category_score,
+        "all_scores": all_scores,
         "show_analysis": True,
         "gate_status": "proceed"
     }
