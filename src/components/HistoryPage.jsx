@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTrash, FaClock, FaComments, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
+import { FaTrash, FaClock, FaComments, FaArrowRight, FaArrowLeft, FaMicrophone } from 'react-icons/fa';
 import { MessageSquare } from 'lucide-react';
 import Sidebar from './Sidebar';
 
@@ -80,7 +80,9 @@ const HistoryPage = ({
   };
 
   const handleContinue = (sessionId) => {
-    if (onContinueConversation) onContinueConversation(sessionId);
+    const conv = conversations.find(c => c.session_id === sessionId);
+    const convType = conv?.conv_type || 'chat';
+    if (onContinueConversation) onContinueConversation(sessionId, convType);
   };
 
   return (
@@ -203,7 +205,12 @@ const HistoryPage = ({
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 text-purple-300/50 text-xs">
-                        <span className="flex items-center gap-1"><FaComments /> {conv.message_count} messages</span>
+                        {conv.conv_type === 'voice' ? (
+                          <span className="flex items-center gap-1 text-pink-400/70"><FaMicrophone /> Voice</span>
+                        ) : (
+                          <span className="flex items-center gap-1"><FaComments /> Chat</span>
+                        )}
+                        <span className="flex items-center gap-1">{conv.message_count} messages</span>
                         <span className="flex items-center gap-1"><FaClock /> {formatTime(conv.created_at)}</span>
                       </div>
                     </div>

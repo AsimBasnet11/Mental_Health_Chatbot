@@ -82,6 +82,7 @@ def init_db():
         conn.execute("""CREATE TABLE IF NOT EXISTS conversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
             session_id TEXT UNIQUE NOT NULL, title TEXT,
+            conv_type TEXT NOT NULL DEFAULT 'chat',
             created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id))""")
         conn.execute("""CREATE TABLE IF NOT EXISTS messages (
@@ -96,6 +97,12 @@ def init_db():
             all_scores TEXT NOT NULL, high_risk INTEGER NOT NULL DEFAULT 0,
             timestamp TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id))""")
         conn.commit()
+        # Migration: add conv_type column if missing (for existing databases)
+        try:
+            conn.execute("ALTER TABLE conversations ADD COLUMN conv_type TEXT NOT NULL DEFAULT 'chat'")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
     log.info("Database initialized")
 
 init_db()
@@ -132,7 +139,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: str; password: str
 class ChatIn(BaseModel):
-    message: str; session_id: str = "default"
+    message: str; session_id: str = "default"; source: str = "chat"
 class AnalyzeIn(BaseModel):
     text: str; session_id: Optional[str] = None
 class SummaryIn(BaseModel):
@@ -269,8 +276,9 @@ def chat(body: ChatIn, current_user=Depends(get_optional_user)):
                 now = datetime.utcnow().isoformat()
                 if not conv:
                     title = user_message[:80] + ("..." if len(user_message) > 80 else "")
-                    cur = conn.execute("INSERT INTO conversations (user_id,session_id,title,created_at,updated_at) VALUES (?,?,?,?,?)",
-                        (current_user["user_id"], session_id, title, now, now))
+                    conv_type = body.source if body.source in ("chat", "voice") else "chat"
+                    cur = conn.execute("INSERT INTO conversations (user_id,session_id,title,conv_type,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+                        (current_user["user_id"], session_id, title, conv_type, now, now))
                     conv_id = cur.lastrowid
                 else:
                     conv_id = conv["id"]
@@ -343,7 +351,7 @@ async def tts(body: TTSIn):
 @app.get("/api/conversations")
 def get_conversations(current_user=Depends(get_current_user)):
     with get_db() as conn:
-        convs = conn.execute("""SELECT c.id, c.session_id, c.title, c.created_at, c.updated_at,
+        convs = conn.execute("""SELECT c.id, c.session_id, c.title, c.conv_type, c.created_at, c.updated_at,
             (SELECT COUNT(*) FROM messages WHERE conversation_id=c.id) as msg_count
             FROM conversations c WHERE c.user_id=? ORDER BY c.updated_at DESC LIMIT 50""",
             (current_user["user_id"],)).fetchall()
@@ -352,6 +360,7 @@ def get_conversations(current_user=Depends(get_current_user)):
             last = conn.execute("SELECT content,role FROM messages WHERE conversation_id=? ORDER BY timestamp DESC LIMIT 1",
                 (c["id"],)).fetchone()
             result.append({"session_id": c["session_id"], "title": c["title"],
+                "conv_type": c["conv_type"] if c["conv_type"] else "chat",
                 "created_at": c["created_at"], "updated_at": c["updated_at"],
                 "message_count": c["msg_count"],
                 "last_message": last["content"][:100] if last else "",

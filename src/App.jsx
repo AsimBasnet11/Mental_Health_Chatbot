@@ -35,6 +35,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const sessionIdRef = useRef('session_' + Date.now());
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [voiceContinueMessages, setVoiceContinueMessages] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Auto-scroll
@@ -93,18 +94,26 @@ function App() {
   };
 
   // ─── Continue from history ───
-  const handleContinueConversation = async (sid) => {
+  const handleContinueConversation = async (sid, convType = 'chat') => {
     sessionIdRef.current = sid;
     setSessionEnded(false);
-    setCurrentPage('home');
     try {
       const res = await fetch(`${API_BASE}/api/conversations/${sid}`, { headers: authHeaders() });
       if (!res.ok) throw new Error('Failed to load conversation');
       const data = await res.json();
-      setMessages(data.messages.map(m => ({ text: m.content, sender: m.role === 'user' ? 'user' : 'bot' })));
+      if (convType === 'voice') {
+        // Load into voice page format
+        const voiceMsgs = data.messages.map(m => ({ text: m.content, isUser: m.role === 'user' }));
+        setVoiceContinueMessages(voiceMsgs);
+        setCurrentPage('voice');
+      } else {
+        setMessages(data.messages.map(m => ({ text: m.content, sender: m.role === 'user' ? 'user' : 'bot' })));
+        setCurrentPage('home');
+      }
     } catch (e) {
       console.error('Continue conversation error:', e);
       showWelcome();
+      setCurrentPage('home');
     }
   };
 
@@ -198,7 +207,7 @@ function App() {
   };
 
   if (currentPage === 'voice') {
-    return <VoicePage onBack={handleHomeClick} {...navProps} currentSessionId={sessionIdRef.current} />;
+    return <VoicePage onBack={handleHomeClick} {...navProps} currentSessionId={sessionIdRef.current} initialMessages={voiceContinueMessages} onMessagesLoaded={() => setVoiceContinueMessages(null)} />;
   }
   if (currentPage === 'mental-state') {
     return <MentalStatePage onBack={handleHomeClick} {...navProps} currentSessionId={sessionIdRef.current} />;

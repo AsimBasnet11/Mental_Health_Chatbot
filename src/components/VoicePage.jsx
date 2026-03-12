@@ -8,7 +8,7 @@ const API_BASE = "http://localhost:8000";
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
 
-const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, user, onLogout, onNewChat, currentSessionId }) => {
+const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, user, onLogout, onNewChat, currentSessionId, initialMessages, onMessagesLoaded }) => {
   const [isListening, setIsListening] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
   const [messages, setMessages] = useState([]);
@@ -51,12 +51,17 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     return () => clearInterval(interval);
   }, [isListening]);
 
-  // Initial bot message
+  // Initial bot message or continue from history
   useEffect(() => {
-    setMessages([{
-      text: "Hello! I'm here to listen and support you.\nFeel free to share what's on your mind today.",
-      isUser: false
-    }]);
+    if (initialMessages && initialMessages.length > 0) {
+      setMessages(initialMessages);
+      if (onMessagesLoaded) onMessagesLoaded();
+    } else {
+      setMessages([{
+        text: "Hello! I'm here to listen and support you.\nFeel free to share what's on your mind today.",
+        isUser: false
+      }]);
+    }
   }, []);
 
   // Request microphone permission
@@ -160,7 +165,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ message: text, session_id: currentSessionId })
+        body: JSON.stringify({ message: text, session_id: currentSessionId, source: "voice" })
       });
       
       if (!res.ok) {
