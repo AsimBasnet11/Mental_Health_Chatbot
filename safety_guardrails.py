@@ -19,13 +19,7 @@ PROFESSIONAL_HELP_SUGGESTION = (
 )
 
 LOW_CONFIDENCE_FOLLOWUP = (
-    "I want to make sure I understand you correctly. "
-    "Could you tell me more about how you are feeling?"
-)
-
-SAFE_CLOSING = (
-    "Remember that speaking with a licensed professional "
-    "can provide additional support."
+    "Could you tell me a bit more about what you're feeling?"
 )
 
 
@@ -57,19 +51,8 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0):
 
     response = " ".join(filtered_sentences)
 
-    # Rule 2 — Low Confidence Handler
-    if emotion_score < 0.5 or category_score < 0.5:
+    # Rule 2 — Low Confidence: ask for clarification when models are unsure
+    if emotion_score < 0.3 and category_score < 0.3:
         response = response.rstrip() + " " + LOW_CONFIDENCE_FOLLOWUP
-
-    # Rule 3 — Response Too Short (less than 20 words)
-    if len(response.split()) < 20:
-        response = response.rstrip()
-        if not response.endswith("?"):
-            response += " Can you share more about what you're going through?"
-
-    # Rule 4 — Always Safe Closing for high-confidence categories
-    if category_score > 0.85:
-        if SAFE_CLOSING.lower() not in response.lower():
-            response = response.rstrip() + " " + SAFE_CLOSING
 
     return response

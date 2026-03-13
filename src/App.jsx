@@ -105,10 +105,18 @@ function App() {
       setIsTyping(true);
 
       // Step 2: Get AI counselor response (full pipeline)
+      // Pass pre-computed analysis to avoid running detection models twice
       const chatRes = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, session_id: sessionId })
+        body: JSON.stringify({
+          message: text,
+          session_id: sessionId,
+          emotion: analysisData.emotion?.label || null,
+          emotion_score: analysisData.emotion?.confidence || 0,
+          category: analysisData.mental_state?.label || null,
+          category_score: analysisData.mental_state?.confidence || 0
+        })
       });
 
       if (!chatRes.ok) throw new Error(`Chat error: ${chatRes.status}`);

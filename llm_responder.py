@@ -8,9 +8,30 @@ Supports two modes:
 """
 
 import os
+import re
 import json
 import urllib.request
 import urllib.error
+
+
+def _trim_to_last_sentence(text):
+    """Trim text to the last complete sentence to avoid cut-off responses."""
+    text = text.strip()
+    if not text:
+        return text
+    # If already ends with sentence-ending punctuation, return as-is
+    if text[-1] in '.!?"':
+        return text
+    # Find the last sentence-ending punctuation
+    match = re.search(r'[.!?]["\')]?\s*', text)
+    if match:
+        # Find the LAST occurrence
+        last_pos = 0
+        for m in re.finditer(r'[.!?]["\')]?(?:\s|$)', text):
+            last_pos = m.end()
+        if last_pos > 0:
+            return text[:last_pos].strip()
+    return text
 
 
 class LLMResponder:
@@ -66,19 +87,19 @@ class LLMResponder:
         """Generate response using local GGUF model."""
         output = self.llm(
             prompt,
-            max_tokens=120,
+            max_tokens=256,
             temperature=0.7,
             stop=["User:", "Human:", "<|eot_id|>"],
             echo=False
         )
-        return output["choices"][0]["text"].strip()
+        return _trim_to_last_sentence(output["choices"][0]["text"])
 
     def _generate_remote(self, prompt):
         """Generate response by calling Colab LLM API."""
         url = f"{self.remote_url}/generate"
         payload = json.dumps({
             "prompt": prompt,
-            "max_tokens": 120,
+            "max_tokens": 256,
             "temperature": 0.7
         }).encode("utf-8")
 
@@ -92,7 +113,7 @@ class LLMResponder:
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                return data.get("response", "").strip()
+                return _trim_to_last_sentence(data.get("response", ""))
         except urllib.error.URLError as e:
             print(f"[LLM] Remote API error: {e}")
             return "I'm having trouble connecting to the language model right now. Please try again in a moment."

@@ -48,12 +48,15 @@ def _get_llm_responder():
 
 # ─── MAIN PIPELINE ──────────────────────────────────────────────────
 
-def process_user_input(user_message, conversation_history):
+def process_user_input(user_message, conversation_history, pre_analysis=None):
     """Main pipeline function that processes a user message end to end.
 
     Args:
         user_message: The user's input text (from ASR or typed).
         conversation_history: ConversationHistory instance.
+        pre_analysis: Optional dict with pre-computed emotion/category from /analyze.
+            Keys: emotion, emotion_score, category, category_score.
+            If provided, skips re-running detection models.
 
     Returns:
         dict with keys:
@@ -82,23 +85,30 @@ def process_user_input(user_message, conversation_history):
             "gate_status": gate_result["status"]
         }
 
-    # Step 2: Emotion Detection
-    emotion, emotion_score = detect_emotion(user_message)
+    # Step 2 & 3: Use pre-computed analysis if available, otherwise detect
+    if pre_analysis:
+        emotion = pre_analysis.get("emotion")
+        emotion_score = pre_analysis.get("emotion_score", 0.0)
+        category = pre_analysis.get("category")
+        category_score = pre_analysis.get("category_score", 0.0)
+    else:
+        emotion, emotion_score = detect_emotion(user_message)
+        category, category_score = classify_mental_health(user_message)
 
-    # Step 3: Mental Health Classification
-    category, category_score = classify_mental_health(user_message)
+    # Step 4: Get history BEFORE adding current message (avoid duplication)
+    history_for_prompt = conversation_history.get_safe_history()
 
-    # Step 4: Store in conversation history
+    # Step 4b: Now store in conversation history
     conversation_history.add_user_message(
         user_message, emotion, emotion_score, category, category_score
     )
 
-    # Step 5: RAG Search
+    # Step 5: RAG Search (only use if similarity is high enough)
     rag = _get_rag_search()
-    rag_example = rag.get_rag_example(user_message)
+    rag_result = rag.get_rag_example(user_message)
+    rag_example = rag_result if rag_result.get("similarity_score", 0) > 0.45 else None
 
     # Step 6: Build Prompt
-    history_for_prompt = conversation_history.get_safe_history()
     prompt = build_prompt(
         user_message, emotion, emotion_score,
         category, category_score, rag_example, history_for_prompt

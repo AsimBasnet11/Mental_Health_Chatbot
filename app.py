@@ -74,7 +74,17 @@ def chat():
     session_id = data.get("session_id", "default")
     history = get_session(session_id)
 
-    result = process_user_input(user_message, history)
+    # Accept pre-computed analysis to avoid running detection models twice
+    pre_analysis = None
+    if "emotion" in data and "category" in data:
+        pre_analysis = {
+            "emotion": data["emotion"],
+            "emotion_score": data.get("emotion_score", 0.0),
+            "category": data["category"],
+            "category_score": data.get("category_score", 0.0),
+        }
+
+    result = process_user_input(user_message, history, pre_analysis=pre_analysis)
     return jsonify(result)
 
 

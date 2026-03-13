@@ -28,7 +28,7 @@ CRISIS_LEVEL_2 = [
 ]
 
 CRISIS_LEVEL_1 = [
-    "sad", "hopeless", "alone", "empty", "tired of everything",
+    "tired of everything",
     "feel like giving up", "nobody cares", "feel worthless"
 ]
 
@@ -78,8 +78,8 @@ def check_input(user_message):
 
     text = user_message.strip().lower()
 
-    # Check too short (less than 3 words)
-    if len(text.split()) < 3:
+    # Check too short (less than 2 words)
+    if len(text.split()) < 2:
         # But first check if it's a greeting
         if text in GREETING_WORDS:
             return {"status": "greeting", "response": GREETING_RESPONSE}
@@ -100,10 +100,10 @@ def check_input(user_message):
         if keyword in text:
             return {"status": "crisis_2", "response": CRISIS_RESPONSES["crisis_2"]}
 
-    # Check crisis Level 1
-    for keyword in CRISIS_LEVEL_1:
-        if keyword in text:
-            return {"status": "crisis_1", "response": CRISIS_RESPONSES["crisis_1"]}
+    # Check crisis Level 1 — these are common emotional expressions.
+    # Let them proceed through the pipeline so the LLM can respond
+    # with full context from emotion detection + mental health classification.
+    # The models will assess actual severity.
 
     # Message is meaningful — proceed to pipeline
     return {"status": "proceed", "response": None}

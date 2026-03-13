@@ -27,61 +27,50 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
         emotion_score: Emotion confidence score (0.0 - 1.0).
         category: Mental health category label (e.g., 'stress disorder').
         category_score: Category confidence score (0.0 - 1.0).
-        rag_example: dict with 'question' and 'answer' keys from RAG search.
+        rag_example: dict with 'question' and 'answer' keys from RAG search, or None.
         conversation_history: list of last N message dicts with 'role' and 'content'.
 
     Returns:
         Formatted prompt string for Llama 3 instruct model.
     """
-    # Format conversation history (last 8 messages)
-    history_block = ""
-    if conversation_history:
-        history_lines = []
-        for msg in conversation_history[-8:]:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if role == "user":
-                history_lines.append(f"User: {content}")
-            else:
-                history_lines.append(f"Assistant: {content}")
-        history_block = "\n".join(history_lines)
-
-    # Format RAG example
-    rag_block = ""
-    if rag_example:
-        rag_block = (
-            f"Similar question: {rag_example.get('question', '')}\n"
-            f"Example response: {rag_example.get('answer', '')}"
-        )
-
-    # Build the full prompt in Llama 3 instruct format
+    # Build system section with analysis context embedded
     emotion_pct = int(emotion_score * 100)
     category_pct = int(category_score * 100)
 
-    prompt = (
-        f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
-        f"{SYSTEM_PROMPT}<|eot_id|>"
-        f"<|start_header_id|>user<|end_header_id|>\n\n"
-        f"CONTEXT FROM ANALYSIS:\n"
-        f"Detected Emotion: {emotion} (confidence: {emotion_pct}%)\n"
-        f"Mental Health Category: {category} (confidence: {category_pct}%)\n\n"
+    system_section = SYSTEM_PROMPT + "\n\n"
+    system_section += (
+        f"The user's current emotional state is: {emotion} ({emotion_pct}% confidence). "
+        f"Mental health context: {category} ({category_pct}% confidence). "
+        "Use this to guide your tone — do NOT mention these labels in your reply."
     )
 
-    if rag_block:
-        prompt += (
-            f"REFERENCE EXAMPLE FROM THERAPY DATABASE:\n"
-            f"{rag_block}\n\n"
+    if rag_example:
+        system_section += (
+            f"\n\nFor reference, here is an example therapist response to a similar concern:\n"
+            f"\"{rag_example.get('answer', '')}\"\n"
+            "Use this as inspiration for tone and approach, but respond naturally to the user's actual words."
         )
 
-    if history_block:
-        prompt += (
-            f"CONVERSATION HISTORY (last messages):\n"
-            f"{history_block}\n\n"
-        )
+    # Format conversation history as multi-turn dialogue
+    prompt = (
+        f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
+        f"{system_section}<|eot_id|>"
+    )
 
+    # Add conversation history as alternating user/assistant turns
+    if conversation_history:
+        for msg in conversation_history[-6:]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            prompt += (
+                f"<|start_header_id|>{role}<|end_header_id|>\n\n"
+                f"{content}<|eot_id|>"
+            )
+
+    # Add current user message
     prompt += (
-        f"USER MESSAGE:\n{user_message}\n\n"
-        f"Respond as the counselor:<|eot_id|>"
+        f"<|start_header_id|>user<|end_header_id|>\n\n"
+        f"{user_message}<|eot_id|>"
         f"<|start_header_id|>assistant<|end_header_id|>\n\n"
     )
 
