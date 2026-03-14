@@ -64,6 +64,18 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     }
   }, []);
 
+  // Automatically connect to server on mount, disconnect on unmount or session end
+  useEffect(() => {
+    if (!isConnected && !sessionEnded) {
+      connectToServer();
+    }
+    return () => {
+      disconnectFromServer();
+    };
+    // Only run on mount/unmount and when session ends
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionEnded]);
+
   // Request microphone permission
   const requestPermission = async () => {
     if (permissionGranted) return true;

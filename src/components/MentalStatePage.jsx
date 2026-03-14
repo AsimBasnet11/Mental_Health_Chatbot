@@ -95,7 +95,6 @@ const trendColor = (t) =>
 const aggregateSession = (messages) => {
   if (!messages || messages.length === 0) return null;
 
-  // --- Mental state: average the allScores across all messages, then pick top ---
   const allLabels = new Set();
   messages.forEach(m => {
     const scores = m.mentalHealth?.allScores || m.allScores;
@@ -118,11 +117,21 @@ const aggregateSession = (messages) => {
   });
 
   let topMentalLabel = 'Unknown', topMentalConf = 0;
-  Object.entries(avgMentalScores).forEach(([label, conf]) => {
-    if (conf > topMentalConf) { topMentalLabel = label; topMentalConf = conf; }
-  });
 
-  // Fallback: if allScores was empty, use direct mentalHealth label/confidence
+  // Prioritize non-normal categories — if any exist, show that over normal
+  const nonNormalScores = Object.entries(avgMentalScores)
+    .filter(([label]) => label.toLowerCase() !== 'normal');
+
+  if (nonNormalScores.length > 0) {
+    nonNormalScores.forEach(([label, conf]) => {
+      if (conf > topMentalConf) { topMentalLabel = label; topMentalConf = conf; }
+    });
+  } else {
+    Object.entries(avgMentalScores).forEach(([label, conf]) => {
+      if (conf > topMentalConf) { topMentalLabel = label; topMentalConf = conf; }
+    });
+  }
+
   if (topMentalLabel === 'Unknown' || topMentalConf === 0) {
     const labelCount = {};
     messages.forEach(m => {
@@ -143,7 +152,6 @@ const aggregateSession = (messages) => {
     });
   }
 
-  // --- Emotion: count frequency and average confidence ---
   const emotionMap = {};
   messages.forEach(m => {
     const label = getItemEmotionLabel(m);
@@ -248,8 +256,9 @@ const SessionTrendGraph = ({ messages }) => {
               tickLine={false}
               label={{ value: 'Message #', position: 'insideBottomRight', offset: -5, fill: '#a78bfa', fontSize: 11 }}
             />
+            {/* FIX 1: domain auto so chart zooms into actual data range */}
             <YAxis
-              domain={[0, 100]}
+              domain={['auto', 'auto']}
               tick={{ fill: '#c4b5fd', fontSize: 12 }}
               axisLine={{ stroke: 'rgba(139,92,246,0.3)' }}
               tickLine={false}
@@ -264,12 +273,27 @@ const SessionTrendGraph = ({ messages }) => {
         </ResponsiveContainer>
       </div>
 
+      {/* FIX 3: Legend now shows trend values inline */}
       <div className="flex items-center gap-6 mt-3 text-xs text-purple-300/70">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-0.5 bg-purple-500 rounded-full inline-block" /> Emotion Confidence
+          <span className="w-4 h-0.5 bg-purple-500 rounded-full inline-block" />
+          Emotion Confidence
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-0.5 bg-pink-500 rounded-full inline-block" /> Mental Health Confidence
+          <span className="w-4 h-0.5 bg-pink-500 rounded-full inline-block" />
+          Mental Health Confidence
+        </span>
+        <span className="ml-auto flex items-center gap-1.5">
+          Emotion Trend:
+          <span className={`font-semibold ${trendColor(emotionTrend)}`}>
+            {emotionTrend}
+          </span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          Mental Trend:
+          <span className={`font-semibold ${trendColor(mentalTrend)}`}>
+            {mentalTrend}
+          </span>
         </span>
       </div>
 
@@ -348,18 +372,6 @@ const EmotionDistributionChart = ({ emotionMap }) => {
 
   if (data.length === 0) return null;
 
-  const RADIAN = Math.PI / 180;
-  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, name, percent }) => {
-    const radius = innerRadius + (outerRadius - innerRadius) * 1.4;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    return percent > 0.08 ? (
-      <text x={x} y={y} fill="#c4b5fd" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11}>
-        {name} ({(percent * 100).toFixed(0)}%)
-      </text>
-    ) : null;
-  };
-
   return (
     <div className="bg-[#1a1035]/60 backdrop-blur-md border border-purple-500/20 rounded-2xl p-6">
       <div className="flex items-center gap-3 mb-6">
@@ -371,11 +383,20 @@ const EmotionDistributionChart = ({ emotionMap }) => {
           <p className="text-sm text-purple-300/60">Which emotions appeared in this session</p>
         </div>
       </div>
-      <div className="w-full h-56">
+
+      <div className="w-full h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%"
-              outerRadius={80} label={renderLabel}>
+            {/* FIX 2: label={false} — legend below instead of overlapping labels */}
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={75}
+              label={false}
+            >
               {data.map((entry, i) => (
                 <Cell key={i} fill={entry.fill} fillOpacity={0.85} />
               ))}
@@ -387,6 +408,20 @@ const EmotionDistributionChart = ({ emotionMap }) => {
             />
           </PieChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Legend below — no overlap */}
+      <div className="flex flex-wrap gap-2 mt-3 justify-center">
+        {data.map((entry, i) => (
+          <span key={i} className="flex items-center gap-1.5 text-xs text-purple-200">
+            <span
+              className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+              style={{ backgroundColor: entry.fill }}
+            />
+            {entry.name}
+            <span className="text-purple-400/60">×{entry.value}</span>
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -426,7 +461,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
           return;
         }
       }
-      // fallback to localStorage
       const saved = localStorage.getItem('analysisHistory');
       if (saved) setAnalysisHistory(JSON.parse(saved));
     } catch (e) {
@@ -436,7 +470,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
     } finally { setLoading(false); }
   };
 
-  /* ─── Filter current session messages ─── */
   const currentSessionMessages = useMemo(() => {
     if (!currentSessionId) return [];
     return analysisHistory
@@ -444,20 +477,17 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   }, [analysisHistory, currentSessionId]);
 
-  /* ─── Aggregate result for current session ─── */
   const sessionResult = useMemo(
     () => aggregateSession(currentSessionMessages),
     [currentSessionMessages],
   );
 
-  /* ─── Group past sessions (everything except current) ─── */
   const SESSION_GAP_MS = 30 * 60 * 1000;
   const pastSessions = useMemo(() => {
     const others = analysisHistory.filter(item => {
       const sid = item.sessionId || item.session_id;
       return sid !== currentSessionId;
     });
-    // group by sessionId (or time proximity for legacy)
     const sorted = [...others].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const map = new Map();
     let legacyIdx = 0, lastLegacyKey = null, lastLegacyTime = 0;
@@ -471,21 +501,18 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
       if (!map.has(key)) map.set(key, { sessionId: key, messages: [], firstTimestamp: item.timestamp, lastTimestamp: item.timestamp });
       const g = map.get(key); g.messages.push(item); g.lastTimestamp = item.timestamp;
     });
-    // compute aggregates per session and return newest first
     return Array.from(map.values()).reverse().map(s => ({
       ...s,
       aggregate: aggregateSession(s.messages),
     }));
   }, [analysisHistory, currentSessionId]);
 
-  // Auto-show past sessions when current session has no data
   useEffect(() => {
     if (!loading && currentSessionMessages.length === 0 && pastSessions.length > 0) {
       setShowPastSessions(true);
     }
   }, [loading, currentSessionMessages.length, pastSessions.length]);
 
-  /* ─── No data at all ─── */
   if (!loading && currentSessionMessages.length === 0 && pastSessions.length === 0) {
     return (
       <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
@@ -598,7 +625,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
           ) : (
           <div className="max-w-6xl mx-auto space-y-6">
 
-            {/* No current session data notice */}
             {currentSessionMessages.length === 0 && pastSessions.length > 0 && (
               <div className="bg-purple-600/10 border border-purple-500/20 rounded-2xl p-5 flex items-center gap-4">
                 <FaBrain className="text-3xl text-purple-400 shrink-0" />
@@ -632,7 +658,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Aggregated Mental State */}
                   <div className="bg-[#0a0515]/40 rounded-2xl p-5 border border-green-500/20">
                     <div className="flex items-center gap-2 mb-4">
                       <FaBrain className="text-green-400" />
@@ -657,7 +682,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                     </p>
                   </div>
 
-                  {/* Aggregated Emotion */}
                   <div className="bg-[#0a0515]/40 rounded-2xl p-5 border border-blue-500/20">
                     <div className="flex items-center gap-2 mb-4">
                       <FaHeart className="text-blue-400" />
@@ -696,11 +720,9 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
             {/* ══ CHARTS ROW ══ */}
             {currentSessionMessages.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Mental State Breakdown Bar Chart */}
               {sessionResult?.avgMentalScores && Object.keys(sessionResult.avgMentalScores).length > 0 && (
                 <MentalBreakdownChart avgScores={sessionResult.avgMentalScores} />
               )}
-              {/* Emotion Distribution Pie Chart */}
               {sessionResult?.emotionMap && Object.keys(sessionResult.emotionMap).length > 0 && (
                 <EmotionDistributionChart emotionMap={sessionResult.emotionMap} />
               )}
@@ -794,7 +816,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                     <div key={session.sessionId}
                       className="bg-[#1a1035]/60 border border-purple-500/20 rounded-2xl backdrop-blur-md hover:border-purple-500/40 transition-all overflow-hidden">
 
-                      {/* Session header */}
                       <button
                         onClick={() => setExpandedPastSession(isOpen ? null : session.sessionId)}
                         className="w-full flex items-center justify-between p-5 text-left cursor-pointer"
@@ -826,19 +847,14 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                           )}
                         </div>
                         <FaChevronDown
-                          className={`text-purple-400 text-sm transition-transform duration-300 shrink-0 ml-3 ${
-                            isOpen ? 'rotate-180' : ''
-                          }`}
+                          className={`text-purple-400 text-sm transition-transform duration-300 shrink-0 ml-3 ${isOpen ? 'rotate-180' : ''}`}
                         />
                       </button>
 
-                      {/* Expanded past session detail */}
                       {isOpen && agg && (
                         <div className="px-5 pb-5 space-y-5 animate-fadeIn">
 
-                          {/* Aggregate cards */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Mental State */}
                             <div className="bg-[#0a0515]/40 rounded-2xl p-5 border border-green-500/20">
                               <div className="flex items-center gap-2 mb-4">
                                 <FaBrain className="text-green-400" />
@@ -861,7 +877,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                               </p>
                             </div>
 
-                            {/* Emotion */}
                             <div className="bg-[#0a0515]/40 rounded-2xl p-5 border border-blue-500/20">
                               <div className="flex items-center gap-2 mb-4">
                                 <FaHeart className="text-blue-400" />
@@ -890,7 +905,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                             </div>
                           </div>
 
-                          {/* Charts row */}
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {agg.avgMentalScores && Object.keys(agg.avgMentalScores).length > 0 && (
                               <MentalBreakdownChart avgScores={agg.avgMentalScores} />
@@ -900,10 +914,8 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
                             )}
                           </div>
 
-                          {/* Trend graph */}
                           <SessionTrendGraph messages={session.messages} />
 
-                          {/* Individual messages toggle */}
                           <div className="bg-[#0a0515]/30 border border-purple-500/10 rounded-2xl overflow-hidden">
                             <button
                               onClick={() => setExpandedPastMessages(isMsgOpen ? null : session.sessionId)}
@@ -963,5 +975,16 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
     </div>
   );
 };
+
+/* ── Small reusable components ── */
+const StatCard = ({ label, value, className = 'text-purple-100', icon }) => (
+  <div className="bg-[#0a0515]/40 rounded-xl p-3 border border-purple-500/10">
+    <div className="flex items-center gap-1.5 mb-1">
+      {icon}
+      <span className="text-[10px] text-purple-400/70 uppercase tracking-wider">{label}</span>
+    </div>
+    <div className={`text-sm font-semibold ${className}`}>{value || 'N/A'}</div>
+  </div>
+);
 
 export default MentalStatePage;
