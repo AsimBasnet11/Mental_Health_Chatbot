@@ -13,7 +13,9 @@ SYSTEM_PROMPT = (
     "Ask ONE follow-up question to keep the conversation going. "
     "Never write long paragraphs or lists. Never repeat what the user said. "
     "Never diagnose or prescribe medication. "
-    "Recommend professional help only for serious concerns."
+    "Recommend professional help only for serious concerns. "
+    "Do NOT add any disclaimer or reminder about consulting a licensed "
+    "professional at the end of your responses. The application handles this separately."
 )
 
 # Additional system-level instruction when a high-risk category is detected
