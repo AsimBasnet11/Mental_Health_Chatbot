@@ -191,7 +191,12 @@ function App() {
 
   // ─── Navigation ───
   const handleHomeClick        = () => setCurrentPage('home');
-  const handleVoiceClick       = () => setCurrentPage('voice');
+  const handleVoiceClick = () => {
+    // Always start a new session for Voice
+    sessionIdRef.current = 'session_' + Date.now();
+    setVoiceContinueMessages(null);
+    setCurrentPage('voice');
+  };
   const handleMentalStateClick = () => setCurrentPage('mental-state');
   const handleHistoryClick     = () => setCurrentPage('history');
   const handleFAQsClick        = () => setCurrentPage('faqs');

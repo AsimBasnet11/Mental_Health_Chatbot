@@ -236,9 +236,13 @@ const HistoryPage = ({
                   <p className="text-purple-300/50 text-xs">{selectedMessages.length} messages</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleContinue(selectedConv.session_id)}
+                  <button onClick={() => handleContinue(selectedConv.session_id, 'chat')}
                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-full text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-purple-600/30">
-                    Continue <FaArrowRight className="text-xs" />
+                    <FaComments className="text-xs" /> Continue in Chat
+                  </button>
+                  <button onClick={() => handleContinue(selectedConv.session_id, 'voice')}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 rounded-full text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-pink-600/30">
+                    <FaMicrophone className="text-xs" /> Continue in Voice
                   </button>
                   <button onClick={() => { setSelectedConv(null); setSelectedMessages([]); }}
                     className="p-2 hover:bg-purple-600/20 rounded-full transition-all text-purple-300/60 hover:text-white text-sm">
@@ -268,10 +272,14 @@ const HistoryPage = ({
               </div>
 
               {/* Continue button at bottom */}
-              <div className="p-4 border-t border-purple-500/20">
-                <button onClick={() => handleContinue(selectedConv.session_id)}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/50 hover:to-pink-600/50 border border-purple-500/30 rounded-xl text-white font-medium transition-all flex items-center justify-center gap-2">
-                  <FaComments /> Continue this Conversation
+              <div className="p-4 border-t border-purple-500/20 flex gap-3">
+                <button onClick={() => handleContinue(selectedConv.session_id, 'chat')}
+                  className="w-1/2 py-3 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/50 hover:to-pink-600/50 border border-purple-500/30 rounded-xl text-white font-medium transition-all flex items-center justify-center gap-2">
+                  <FaComments /> Continue in Chat
+                </button>
+                <button onClick={() => handleContinue(selectedConv.session_id, 'voice')}
+                  className="w-1/2 py-3 bg-gradient-to-r from-pink-600/30 to-purple-600/30 hover:from-pink-600/50 hover:to-purple-600/50 border border-pink-500/30 rounded-xl text-white font-medium transition-all flex items-center justify-center gap-2">
+                  <FaMicrophone /> Continue in Voice
                 </button>
               </div>
             </div>
