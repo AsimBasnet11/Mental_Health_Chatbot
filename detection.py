@@ -152,6 +152,7 @@ def detect_emotion(text):
     tokenizer, model = _load_emotion_model()
     cleaned = clean(text)
     if not cleaned:
+        # Only return neutral if input is empty after cleaning
         return ("neutral", 0.5)
 
     probs = _infer_emotion_probs(cleaned, tokenizer, model)
@@ -168,6 +169,7 @@ def classify_mental_health(text):
     tokenizer, model = _load_sentiment_model()
     cleaned = clean(text)
     if not cleaned:
+        # Only return Normal if input is empty after cleaning
         return ("Normal", 0.5)
 
     probs = _infer_best_chunk(cleaned, tokenizer, model)
@@ -184,6 +186,7 @@ def classify_mental_health_with_scores(text):
     tokenizer, model = _load_sentiment_model()
     cleaned = clean(text)
     if not cleaned:
+        # Only return Normal if input is empty after cleaning
         return ("Normal", 0.5, {})
 
     probs = _infer_best_chunk(cleaned, tokenizer, model)
@@ -199,6 +202,7 @@ def analyze_full(text):
     """
     cleaned = clean(text)
     if not cleaned:
+        # Only return neutral/Normal if input is empty after cleaning
         return {
             "emotion": {"label": "neutral", "confidence": 0.5},
             "mental_state": {"label": "Normal", "confidence": 0.5,
@@ -237,7 +241,6 @@ def analyze_full(text):
     }
 
     # Emotion (skip if suicidal)
-    emotion = None
     if not high_risk:
         e_tok, e_model = _load_emotion_model()
         e_probs = _infer_emotion_probs(cleaned, e_tok, e_model)

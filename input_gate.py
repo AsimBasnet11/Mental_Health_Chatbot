@@ -161,14 +161,6 @@ def check_input(user_message):
     text = _normalise(user_message)
     stripped = text.rstrip("!?.,")
 
-    # ── Too short (< 3 words) ────────────────────────────────
-    if len(text.split()) < 3:
-        if stripped in GREETING_WORDS or text in GREETING_WORDS:
-            log.debug("Greeting (short): %r", text)
-            return _gate("greeting", GREETING_RESPONSE)
-        log.debug("Too short: %r", text)
-        return _gate("too_short", TOO_SHORT_RESPONSE)
-
     # ── Greetings ─────────────────────────────────────────────
     if stripped in GREETING_WORDS or text in GREETING_WORDS:
         log.debug("Greeting: %r", text)
@@ -187,10 +179,17 @@ def check_input(user_message):
         log.info("Crisis L1 detected: %r", text[:80])
         return _gate("crisis_1", CRISIS_RESPONSES["crisis_1"], crisis_level=1)
 
+    # ── Too short (< 4 words) ────────────────────────────────
+    if len(text.split()) < 4:
+        # If greeting/casual, already handled above
+        # For all other short inputs, expand neutrally
+        log.debug("Too short (expand neutrally): %r", text)
+        return _gate("too_short", TOO_SHORT_RESPONSE)
+
     # ── Off-topic redirect ────────────────────────────────────
     if _OFF_TOPIC_RE.search(text):
         log.debug("Off-topic: %r", text[:80])
         return _gate("off_topic", OFF_TOPIC_RESPONSE)
 
-    # ── Meaningful message — pass to pipeline ─────────────────
+    # ── Meaningful message — pass to pipeline (model-driven) ────────────
     return _gate("proceed", None)
