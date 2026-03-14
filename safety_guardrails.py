@@ -40,14 +40,15 @@ LOW_CONFIDENCE_FOLLOWUP = (
     "Could you tell me more about how you are feeling?"
 )
 
-SAFE_CLOSING = (
-    "Remember that speaking with a licensed professional "
-    "can provide additional support."
-)
+# ✅ UPDATED: Removed from every message — shown once by frontend after 3rd message
+SAFE_CLOSING = ""
 
+# ✅ UPDATED: Nepal-specific crisis resources
 CRISIS_RESOURCES = (
-    "If you're in immediate danger, please call 988 (Suicide & Crisis Lifeline) "
-    "or text HOME to 741741 (Crisis Text Line). You are not alone."
+    "If you're in immediate danger, please reach out for help — you are not alone. "
+    "Nepal Mental Health Helpline: 1166 (Transcultural Psychosocial Organization Nepal). "
+    "Saathi Helpline: 1145. "
+    "Or visit your nearest hospital emergency department immediately."
 )
 
 # Hard cap so the bot doesn't ramble
@@ -112,14 +113,14 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
     if len(words) > _MAX_RESPONSE_WORDS:
         response = " ".join(words[:_MAX_RESPONSE_WORDS]).rstrip(".,;: ") + "."
 
-    # Rule 7 — Always Safe Closing for high-confidence categories
-    if category_score > 0.85:
-        if SAFE_CLOSING.lower() not in response.lower():
-            response = response.rstrip() + " " + SAFE_CLOSING
+    # Rule 7 — Safe Closing (disabled — frontend handles this after 3rd message)
+    # if category_score > 0.85:
+    #     if SAFE_CLOSING.lower() not in response.lower():
+    #         response = response.rstrip() + " " + SAFE_CLOSING
 
-    # Rule 8 — Inject crisis resources for Suicidal category
+    # Rule 8 — Inject Nepal crisis resources for Suicidal category
     if category and category.lower() == "suicidal" and category_score >= 0.5:
-        if "988" not in response:
+        if "1166" not in response:
             response = response.rstrip() + " " + CRISIS_RESOURCES
 
     return response

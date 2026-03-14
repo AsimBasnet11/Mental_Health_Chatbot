@@ -93,7 +93,7 @@ _CONTRACTIONS = {
 
 # ── Fixed responses ──────────────────────────────────────────
 GREETING_RESPONSE = (
-    "Hello! I'm Aria, your mental health support companion. "
+    "Hello! I'm MindCare, your mental health support companion. "
     "I'm here to listen and support you. How are you feeling today?"
 )
 
