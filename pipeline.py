@@ -26,6 +26,18 @@ _rag_search = None
 _llm_responder = None
 
 
+def _recent_user_prompt_context(conversation_history, user_message, window=8):
+    """Build a rolling text context from the last N user prompts plus current input."""
+    recent_user_messages = [
+        m.get("content", "")
+        for m in conversation_history.get_all()
+        if m.get("role") == "user" and m.get("content")
+    ]
+    recent_user_messages = recent_user_messages[-(window - 1):]
+    recent_user_messages.append(user_message)
+    return "\n".join(recent_user_messages)
+
+
 def _get_rag_search():
     global _rag_search
     if _rag_search is None:
@@ -68,8 +80,9 @@ def process_user_input(user_message, conversation_history):
     # Step 1: Input Gate
     gate_result = check_input(user_message)
 
-    # Step 2: Emotion Detection — ALWAYS run so Mental State page has data
-    emotion, emotion_score = detect_emotion(user_message)
+    # Step 2: Emotion Detection — run on a rolling window of user prompts
+    emotion_input = _recent_user_prompt_context(conversation_history, user_message, window=8)
+    emotion, emotion_score = detect_emotion(emotion_input)
 
     # Step 3: Mental Health Classification — ALWAYS run
     category, category_score, all_scores = classify_mental_health_with_scores(user_message)
@@ -96,12 +109,11 @@ def process_user_input(user_message, conversation_history):
         user_message, emotion, emotion_score, category, category_score
     )
 
-    # Step 5: RAG Search
-    rag = _get_rag_search()
-    rag_example = rag.get_rag_example(user_message)
+    # Step 5: RAG Search (temporarily disabled)
+    rag_example = None
 
-    # Step 6: Build Prompt
-    history_for_prompt = conversation_history.get_safe_history()
+    # Step 6: Build Prompt (exclude current user message from history to avoid duplication)
+    history_for_prompt = conversation_history.get_all()[:-1]
     prompt = build_prompt(
         user_message, emotion, emotion_score,
         category, category_score, rag_example, history_for_prompt

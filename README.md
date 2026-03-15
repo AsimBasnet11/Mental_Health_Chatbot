@@ -78,16 +78,10 @@ The 4.58 GB LLM model is best run on Google Colab with a free T4 GPU.
 4. Paste your ngrok auth token in Cell 3 (get one free at https://dashboard.ngrok.com)
 5. Run all cells in order
 6. Copy the public ngrok URL from Cell 5 (e.g. `https://xyz.ngrok-free.app`)
-7. Set the environment variable before starting the backend:
+7. Create a `.env` file in the project root and add:
 
-**PowerShell:**
-```powershell
-$env:LLM_API_URL = "https://xyz.ngrok-free.app"
-```
-
-**Linux / macOS / Colab:**
-```bash
-export LLM_API_URL="https://xyz.ngrok-free.app"
+```env
+LLM_API_URL=https://xyz.ngrok-free.app
 ```
 
 > **Local mode (16+ GB RAM):** If you have enough RAM, skip Colab. Place `Counselor_Llama3_Q4.gguf` in this directory and do **not** set `LLM_API_URL`. The model will load locally.
@@ -96,7 +90,6 @@ export LLM_API_URL="https://xyz.ngrok-free.app"
 
 **Terminal 1 — Backend:**
 ```powershell
-$env:LLM_API_URL = "https://xyz.ngrok-free.app"   # your Colab URL
 python app.py
 ```
 
@@ -147,7 +140,7 @@ The counselor LLM (Counselor_Llama3_Q4.gguf, 4.58 GB) runs on **Google Colab** t
 3. Upload `Counselor_Llama3_Q4.gguf` when prompted (Cell 2)
 4. Paste your ngrok auth token in Cell 3
 5. Run all cells — Cell 4 starts a Flask API and Cell 5 prints the public URL
-6. Set the `LLM_API_URL` environment variable to that URL before running `python app.py`
+6. Set `LLM_API_URL` in your `.env` file before running `python app.py`
 
 ### API
 

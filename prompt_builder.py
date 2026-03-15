@@ -1,7 +1,7 @@
 """
 Prompt Builder (Task 3)
-Combines user message, conversation history, emotion, classification,
-and RAG example into a structured prompt for the LLM.
+Combines user message, conversation history, and RAG example into a
+structured prompt for the LLM. Emotion metrics are intentionally excluded.
 Uses Llama 3 instruct template format.
 """
 
@@ -44,11 +44,11 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
     Returns:
         Formatted prompt string for Llama 3 instruct model.
     """
-    # Format conversation history (last 8 messages)
+    # Format full in-session conversation history.
     history_block = ""
     if conversation_history:
         history_lines = []
-        for msg in conversation_history[-8:]:
+        for msg in conversation_history:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             if role == "user":
@@ -65,10 +65,6 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
             f"Example response style (do NOT copy verbatim): {rag_example.get('answer', '')}"
         )
 
-    # Build the full prompt in Llama 3 instruct format
-    emotion_pct = int(emotion_score * 100)
-    category_pct = int(category_score * 100)
-
     # Adapt system prompt for high-risk situations
     system = SYSTEM_PROMPT
     if category in _HIGH_RISK_CATEGORIES and category_score >= 0.55:
@@ -78,9 +74,6 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
         f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
         f"{system}<|eot_id|>"
         f"<|start_header_id|>user<|end_header_id|>\n\n"
-        f"CONTEXT FROM ANALYSIS:\n"
-        f"Detected Emotion: {emotion} (confidence: {emotion_pct}%)\n"
-        f"Mental Health Category: {category} (confidence: {category_pct}%)\n\n"
     )
 
     if rag_block:
@@ -91,7 +84,7 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
 
     if history_block:
         prompt += (
-            f"CONVERSATION HISTORY (last messages):\n"
+            f"CONVERSATION HISTORY (current session):\n"
             f"{history_block}\n\n"
         )
 

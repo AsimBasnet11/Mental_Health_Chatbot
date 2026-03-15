@@ -14,9 +14,9 @@ import json
 import time
 import logging
 import sqlite3
-from contextlib import contextmanager
+from contextlib import contextmanager, asynccontextmanager
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import asyncio
@@ -37,12 +37,31 @@ from pipeline import process_user_input, end_session
 from detection import detect_emotion, classify_mental_health, analyze_full
 
 # ── Logging ──────────────────────────────────────────────────
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("mindcare")
+
+
+def _is_truthy(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+if _is_truthy(os.environ.get("QUIET_THIRD_PARTY", "1")):
+    for noisy_logger in (
+        "httpx",
+        "httpcore",
+        "huggingface_hub",
+        "sentence_transformers",
+        "transformers",
+        "urllib3",
+        "uvicorn.access",
+    ):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 # ── Config (env-first, safe defaults) ────────────────────────
 SECRET_KEY        = os.environ.get("JWT_SECRET_KEY", "your-secret-key-change-this-in-production")
@@ -111,9 +130,14 @@ init_db()
 def hash_password(pw): return pwd_context.hash(pw)
 def verify_password(plain, hashed): return pwd_context.verify(plain, hashed)
 
+
+def utcnow():
+    return datetime.now(timezone.utc)
+
+
 def create_token(user_id, email):
     return jwt.encode(
-        {"sub": str(user_id), "email": email, "exp": datetime.utcnow() + timedelta(days=TOKEN_EXPIRE_DAYS)},
+        {"sub": str(user_id), "email": email, "exp": utcnow() + timedelta(days=TOKEN_EXPIRE_DAYS)},
         SECRET_KEY, algorithm=ALGORITHM)
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
@@ -193,7 +217,23 @@ def get_session(session_id, user_id=None):
     return sessions[session_id]
 
 
-app = FastAPI(title="Mental Health Chatbot API", version="7.0.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Pre-load heavy models so the first request is fast."""
+    log.info("Warming up models...")
+    try:
+        from detection import _load_sentiment_model, _load_emotion_model
+        _load_sentiment_model()
+        _load_emotion_model()
+        log.info("Detection models loaded")
+    except Exception as e:
+        log.error("Detection model warmup failed: %s", e)
+    log.info("RAG support disabled (warmup skipped)")
+    log.info("Warmup complete")
+    yield
+
+
+app = FastAPI(title="Mental Health Chatbot API", version="7.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 # ── Rate limiting middleware (#5) ────────────────────────────
@@ -228,7 +268,7 @@ def register(body: RegisterIn):
         if conn.execute("SELECT id FROM users WHERE email=?", (body.email,)).fetchone():
             raise HTTPException(400, "Email already registered.")
         hashed = hash_password(body.password)
-        created = datetime.utcnow().isoformat()
+        created = utcnow().isoformat()
         cur = conn.execute("INSERT INTO users (email,name,password,created) VALUES (?,?,?,?)",
             (body.email, body.name, hashed, created))
         conn.commit()
@@ -273,7 +313,7 @@ def chat(body: ChatIn, current_user=Depends(get_optional_user)):
             with get_db() as conn:
                 conv = conn.execute("SELECT id FROM conversations WHERE session_id=? AND user_id=?",
                     (session_id, current_user["user_id"])).fetchone()
-                now = datetime.utcnow().isoformat()
+                now = utcnow().isoformat()
                 if not conv:
                     title = user_message[:80] + ("..." if len(user_message) > 80 else "")
                     conv_type = body.source if body.source in ("chat", "voice") else "chat"
@@ -321,7 +361,7 @@ def analyze(body: AnalyzeIn, current_user=Depends(get_optional_user)):
                      emotion.get("label") if emotion else None,
                      round(emotion.get("confidence",0),4) if emotion else None,
                      json.dumps(mental.get("all_scores",{})), int(result.get("high_risk",False)),
-                     datetime.utcnow().isoformat()))
+                     utcnow().isoformat()))
                 conn.commit()
         except Exception as e:
             log.error("Failed to save analysis: %s", e)
@@ -470,31 +510,16 @@ def health():
     }
 
 
-# ── Model warmup on startup (#9) ────────────────────────────
-@app.on_event("startup")
-async def warmup_models():
-    """Pre-load heavy models so the first request is fast."""
-    log.info("Warming up models...")
-    try:
-        from detection import _load_sentiment_model, _load_emotion_model
-        _load_sentiment_model()
-        _load_emotion_model()
-        log.info("Detection models loaded")
-    except Exception as e:
-        log.error("Detection model warmup failed: %s", e)
-    try:
-        from pipeline import _get_rag_search
-        _get_rag_search()
-        log.info("RAG search loaded")
-    except Exception as e:
-        log.error("RAG warmup failed: %s", e)
-    log.info("Warmup complete")
-
-
 if __name__ == "__main__":
     import uvicorn
     log.info("=" * 55)
     log.info("  Mental Health AI Chatbot — Unified Backend")
     log.info("  API running at http://127.0.0.1:8000")
     log.info("=" * 55)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8000,
+        access_log=_is_truthy(os.environ.get("UVICORN_ACCESS_LOG", "0")),
+        log_level=LOG_LEVEL.lower(),
+    )

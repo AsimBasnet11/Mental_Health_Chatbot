@@ -12,29 +12,36 @@ import json
 import logging
 import urllib.request
 import urllib.error
+from dotenv import load_dotenv
 
 log = logging.getLogger("mindcare.llm")
+
+# Load environment variables from project-local .env once at import time.
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 
 class LLMResponder:
     def __init__(self, model_path=None):
         """Initialize the LLM in remote or local mode.
 
-        Remote mode (default): Set LLM_API_URL environment variable to
+        Remote mode (default): Set LLM_API_URL in .env to
         the Colab ngrok URL (e.g. https://xyz.ngrok-free.dev).
 
         Local mode: Only used if LLM_API_URL is not set AND the .gguf
         file exists locally.
         """
-        self.remote_url = os.environ.get(
-            "LLM_API_URL", "https://spongy-kynlee-unflat.ngrok-free.dev"
-        ).strip()
+        self.remote_url = os.environ.get("LLM_API_URL", "").strip()
         self.llm = None
 
         if self.remote_url:
             # Remote mode — LLM runs on Colab
             self.remote_url = self.remote_url.rstrip("/")
             log.info("Remote mode — using Colab API at %s", self.remote_url)
+            if not self._check_remote_health(timeout=8):
+                log.warning(
+                    "Could not reach LLM health endpoint at startup (%s/health).",
+                    self.remote_url,
+                )
         else:
             # Local mode — load model into memory
             if model_path is None:
@@ -46,7 +53,7 @@ class LLMResponder:
                 raise FileNotFoundError(
                     f"Model file not found: {model_path}\n"
                     "Either:\n"
-                    "  1. Set LLM_API_URL env var to your Colab ngrok URL, OR\n"
+                    "  1. Set LLM_API_URL in .env to your Colab ngrok URL, OR\n"
                     "  2. Place Counselor_Llama3_Q4.gguf in the project directory."
                 )
 
@@ -59,6 +66,21 @@ class LLMResponder:
                 verbose=False
             )
             log.info("Model loaded locally.")
+
+    def _check_remote_health(self, timeout=8):
+        """Check whether remote LLM API is reachable and healthy."""
+        health_url = f"{self.remote_url}/health"
+        req = urllib.request.Request(health_url, method="GET")
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status != 200:
+                    return False
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("status") == "ok"
+        except Exception as e:
+            log.warning("LLM health check failed: %s", e)
+            return False
 
     def generate_response(self, prompt):
         """Generate a therapist-like response from the prompt."""
@@ -80,6 +102,9 @@ class LLMResponder:
 
     def _generate_remote(self, prompt):
         """Generate response by calling Colab LLM API."""
+        if not self._check_remote_health(timeout=8):
+            return "I'm unable to reach the language model server right now. Please check your LLM_API_URL and try again."
+
         url = f"{self.remote_url}/generate"
         payload = json.dumps({
             "prompt": prompt,
