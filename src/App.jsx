@@ -102,7 +102,6 @@ function App() {
       if (!res.ok) throw new Error('Failed to load conversation');
       const data = await res.json();
       if (convType === 'voice') {
-        // Load into voice page format
         const voiceMsgs = data.messages.map(m => ({ text: m.content, isUser: m.role === 'user' }));
         setVoiceContinueMessages(voiceMsgs);
         setCurrentPage('voice');
@@ -117,14 +116,12 @@ function App() {
     }
   };
 
-  const formatLabel = (str) => str.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
   // ─── Pipeline chat ───
   const analyzeText = async (text) => {
     if (!text.trim()) return;
     setIsAnalyzing(true);
     try {
-      // Step 1: Full pipeline chat (handles analysis + response + saves to DB)
+      // Full pipeline chat (handles analysis + response + saves to DB)
       const chatRes = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -136,16 +133,13 @@ function App() {
       setIsAnalyzing(false);
       setIsTyping(false);
 
-      const emotionTag = chatData.emotion ? `🎭 ${formatLabel(chatData.emotion)} (${Math.round((chatData.emotion_score || 0) * 100)}%)` : '';
-      const categoryTag = chatData.category ? `🧠 ${formatLabel(chatData.category)} (${Math.round((chatData.category_score || 0) * 100)}%)` : '';
-      const tags = [emotionTag, categoryTag].filter(Boolean).join('  ·  ');
-
+      // Detection removed from chat — handled by Mental State page
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           text: chatData.response,
           sender: 'bot',
-          tags: chatData.show_analysis ? tags : null
+          tags: null
         };
         return newMessages;
       });
@@ -170,9 +164,7 @@ function App() {
       setMessages(prev => [...prev, { text: "No conversation data to summarize yet. Try chatting first!", sender: 'bot' }]);
       return;
     }
-    // Navigate to summary page for the current session
     setCurrentPage('summary');
-    // Start a fresh session so going back to chat is a new conversation
     sessionIdRef.current = 'session_' + Date.now();
     setMessages([]);
     setSessionEnded(false);
@@ -192,7 +184,6 @@ function App() {
   // ─── Navigation ───
   const handleHomeClick        = () => setCurrentPage('home');
   const handleVoiceClick = () => {
-    // Always start a new session for Voice
     sessionIdRef.current = 'session_' + Date.now();
     setVoiceContinueMessages(null);
     setCurrentPage('voice');
@@ -263,9 +254,6 @@ function App() {
                   : 'bg-[#1a1035]/60 border border-purple-500/20 text-purple-200 animate-slideUp'}`}
                 style={{ maxWidth: '70%' }}>
                 {msg.text}
-                {msg.tags && (
-                  <div className="mt-2 pt-2 border-t border-purple-500/20 text-xs text-purple-400/70">{msg.tags}</div>
-                )}
               </div>
             </div>
           ))}
