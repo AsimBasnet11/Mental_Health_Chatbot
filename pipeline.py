@@ -5,7 +5,7 @@ This is the core engine of the chatbot.
 
 Components connected:
 1. Input Gate → 2. Emotion Detection → 3. Mental Health Classification →
-4. Conversation History → 5. RAG Search → 6. Prompt Builder →
+4. Conversation History → 5. Prompt Builder →
 7. LLM Response → 8. Safety Guardrails → 9. Return result
 
 Note: Emotion Detection and Mental Health Classification models are assumed
@@ -21,18 +21,7 @@ from conversation_history import ConversationHistory
 from session_summary import generate_session_summary
 from detection import detect_emotion, classify_mental_health, classify_mental_health_with_scores
 
-# These are loaded lazily to avoid slow imports at module level
-_rag_search = None
 _llm_responder = None
-
-
-def _get_rag_search():
-    global _rag_search
-    if _rag_search is None:
-        from rag_search import RAGSearch
-        _rag_search = RAGSearch()
-    return _rag_search
-
 
 def _get_llm_responder():
     global _llm_responder
@@ -96,15 +85,12 @@ def process_user_input(user_message, conversation_history):
         user_message, emotion, emotion_score, category, category_score
     )
 
-    # Step 5: RAG Search
-    rag = _get_rag_search()
-    rag_example = rag.get_rag_example(user_message)
 
-    # Step 6: Build Prompt
+    # Step 5: Build Prompt (no RAG)
     history_for_prompt = conversation_history.get_safe_history()
     prompt = build_prompt(
         user_message, emotion, emotion_score,
-        category, category_score, rag_example, history_for_prompt
+        category, category_score, history_for_prompt
     )
 
     # Step 7: LLM Response

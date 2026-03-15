@@ -95,8 +95,13 @@ function App() {
 
   // ─── Continue from history ───
   const handleContinueConversation = async (sid, convType = 'chat') => {
+    // Reset all relevant state for a clean continue
     sessionIdRef.current = sid;
     setSessionEnded(false);
+    setIsTyping(false);
+    setIsAnalyzing(false);
+    setMessage('');
+    setVoiceContinueMessages(null);
     try {
       const res = await fetch(`${API_BASE}/api/conversations/${sid}`, { headers: authHeaders() });
       if (!res.ok) throw new Error('Failed to load conversation');
@@ -106,6 +111,7 @@ function App() {
         setVoiceContinueMessages(voiceMsgs);
         setCurrentPage('voice');
       } else {
+        // Always reset messages and scroll
         setMessages(data.messages.map(m => ({ text: m.content, sender: m.role === 'user' ? 'user' : 'bot' })));
         setCurrentPage('home');
       }
@@ -226,12 +232,25 @@ function App() {
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
         {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
-          {[...Array(80)].map((_, i) => (
-            <div key={i} className="absolute bg-white rounded-full opacity-30 animate-pulse"
-              style={{ width: `${Math.random()*2+1}px`, height: `${Math.random()*2+1}px`,
-                top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
-                animationDuration: `${Math.random()*3+2}s` }} />
-          ))}
+          {[...Array(80)].map((_, i) => {
+            // Use deterministic positions for static stars
+            const angle = (i / 80) * 2 * Math.PI;
+            const radius = 45 + (i % 7) * 5;
+            const top = 50 + Math.sin(angle) * radius;
+            const left = 50 + Math.cos(angle) * radius;
+            return (
+              <div
+                key={i}
+                className="absolute bg-white rounded-full opacity-30"
+                style={{
+                  width: `${1.5 + (i % 3) * 0.7}px`,
+                  height: `${1.5 + (i % 3) * 0.7}px`,
+                  top: `${top}%`,
+                  left: `${left}%`,
+                }}
+              />
+            );
+          })}
         </div>
 
         {/* End Session */}

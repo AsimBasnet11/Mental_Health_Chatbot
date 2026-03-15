@@ -62,7 +62,25 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         isUser: false
       }]);
     }
-  }, []);
+    // Reset all state when session changes
+    setPartialTranscript('');
+    accumulatedTextRef.current = '';
+    currentPartialRef.current = '';
+    isWaitingForFlushRef.current = false;
+    hasProcessedRef.current = false;
+    setIsStopping(false);
+    setSessionEnded(false);
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
+    window.speechSynthesis.cancel();
+    if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
+    setIsSpeaking(false);
+    if (isListening) {
+      stopRecording();
+    }
+  }, [currentSessionId]);
 
   // Automatically connect to server on mount, disconnect on unmount or session end
   useEffect(() => {
@@ -108,12 +126,15 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const speakResponse = async (text) => {
     if (!ttsEnabled || !text) return;
 
-    // Stop any current playback
+    // Stop any current playback (Edge TTS or browser)
     if (ttsAudioRef.current) {
       ttsAudioRef.current.pause();
       ttsAudioRef.current = null;
     }
     window.speechSynthesis.cancel();
+
+    // Double-check TTS is still enabled before playing (handles rapid toggle)
+    if (!ttsEnabled) return;
 
     try {
       setIsSpeaking(true);
@@ -141,18 +162,26 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         ttsAudioRef.current = null;
       };
 
-      await audio.play();
+      // Only play if TTS is still enabled
+      if (ttsEnabled) await audio.play();
+      else {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+        ttsAudioRef.current = null;
+      }
     } catch (err) {
       console.error('[TTS] Backend TTS failed, falling back to browser:', err);
       setIsSpeaking(false);
       // Fallback to browser TTS
+      if (!ttsEnabled) return;
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.92;
       utterance.pitch = 1.05;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+      // Only speak if TTS is still enabled
+      if (ttsEnabled) window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -190,18 +219,13 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       setIsAnalyzing(false);
       setIsTyping(false);
 
-      // Build analysis tags (same format as chat page)
-      const emotionTag = chatData.emotion ? `🎭 ${formatLabel(chatData.emotion)} (${Math.round((chatData.emotion_score || 0) * 100)}%)` : '';
-      const categoryTag = chatData.category ? `🧠 ${formatLabel(chatData.category)} (${Math.round((chatData.category_score || 0) * 100)}%)` : '';
-      const tags = [emotionTag, categoryTag].filter(Boolean).join('  ·  ');
 
-      // Replace placeholder with actual AI response
+      // Replace placeholder with actual AI response (no tags)
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           text: chatData.response,
-          isUser: false,
-          tags: chatData.show_analysis ? tags : null
+          isUser: false
         };
         return newMessages;
       });
@@ -244,58 +268,62 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       console.log('[Voice] Already processed, skipping');
       return;
     }
-    
+
     hasProcessedRef.current = true;
     console.log('[Voice] Processing final message...');
-    
+
     // Cancel timeout if it exists
     if (flushTimeoutRef.current) {
       clearTimeout(flushTimeoutRef.current);
       flushTimeoutRef.current = null;
       console.log('[Voice] Cancelled timeout');
     }
-    
+
     let finalText = '';
-    
-    // Priority 1: Accumulated text (best)
-    if (accumulatedTextRef.current.trim()) {
-      finalText = accumulatedTextRef.current.trim();
+
+    // Only use accumulated text if it ends with a sentence-ending punctuation
+    const acc = accumulatedTextRef.current.trim();
+    if (acc && /[.!?]$/.test(acc)) {
+      finalText = acc;
       console.log('[Voice] Using accumulated text:', finalText.length, 'chars');
     }
-    // Priority 2: Current partial (fallback)
-    else if (currentPartialRef.current.trim()) {
+    // Otherwise, fallback to current partial if it looks like a complete thought
+    else if (currentPartialRef.current.trim() && /[.!?]$/.test(currentPartialRef.current.trim())) {
       finalText = currentPartialRef.current.trim();
       console.log('[Voice] Using partial as fallback:', finalText.length, 'chars');
     }
-    // Priority 3: UI state (last resort)
-    else if (partialTranscript.trim()) {
+    // Otherwise, fallback to UI state if it looks like a complete thought
+    else if (partialTranscript.trim() && /[.!?]$/.test(partialTranscript.trim())) {
       finalText = partialTranscript.trim();
       console.log('[Voice] Using UI partial as fallback:', finalText.length, 'chars');
     }
-    
+    // If nothing ends with punctuation, use accumulated text anyway (better than nothing)
+    else if (acc) {
+      finalText = acc;
+      console.log('[Voice] Using accumulated text (no punctuation):', finalText.length, 'chars');
+    }
+
     console.log('[Voice] Final text length:', finalText.length, 'characters');
-    
+
     if (finalText) {
       console.log('[Voice] Sending user message');
-      
       setMessages(prev => [...prev, { 
         text: finalText, 
         isUser: true 
       }]);
-      
       analyzeText(finalText);
     } else {
       console.log('[Voice] No text captured');
       alert('No speech detected. Please try speaking again.');
     }
-    
+
     // Reset buffers for next recording
     accumulatedTextRef.current = '';
     currentPartialRef.current = '';
     setPartialTranscript('');
     isWaitingForFlushRef.current = false;
     setIsStopping(false);
-    
+
     // Keep WebSocket open for next recording
     console.log('[Voice] Ready for next recording');
   };
@@ -567,16 +595,18 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     hasProcessedRef.current = false;
     setIsStopping(false);
     setSessionEnded(false);
-    
+
     if (flushTimeoutRef.current) {
       clearTimeout(flushTimeoutRef.current);
       flushTimeoutRef.current = null;
     }
-    
+
+    // Cancel all TTS (Edge and browser)
     window.speechSynthesis.cancel();
+    if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
     setIsSpeaking(false);
     console.log('[Voice] Chat refreshed');
-    
+
     if (isListening) {
       stopRecording();
     }
@@ -677,7 +707,15 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
             {/* TTS Toggle */}
             <button
-              onClick={() => { setTtsEnabled(prev => { if (prev) { window.speechSynthesis.cancel(); if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; } } return !prev; }); setIsSpeaking(false); }}
+              onClick={() => {
+                setTtsEnabled(prev => {
+                  // Always cancel all TTS when toggling
+                  window.speechSynthesis.cancel();
+                  if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
+                  return !prev;
+                });
+                setIsSpeaking(false);
+              }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
                 ${ttsEnabled
                   ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'
@@ -712,9 +750,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
                 style={{ maxWidth: '70%' }}
               >
                 {msg.text}
-                {msg.tags && (
-                  <div className="mt-2 pt-2 border-t border-purple-500/20 text-xs text-purple-400/70">{msg.tags}</div>
-                )}
+                {/* Detection tags removed */}
               </div>
             </div>
           ))}

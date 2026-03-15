@@ -28,7 +28,7 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
       if (!res.ok) { setError(data.detail || 'Registration failed.'); return; }
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      onLoginSuccess(data.user);
+      onGoLogin();
     } catch {
       setError('Cannot connect to server. Make sure backend is running.');
     } finally { setLoading(false); }

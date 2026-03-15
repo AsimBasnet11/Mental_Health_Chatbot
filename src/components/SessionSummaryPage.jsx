@@ -19,7 +19,6 @@ const formatDate = (timestamp) => {
   });
 };
 
-const trendEmoji = { 'Improved': '📉', 'Worsened': '📈', 'Stable': '➡️' };
 const trendColor = { 'Improved': 'text-green-400', 'Worsened': 'text-red-400', 'Stable': 'text-yellow-400' };
 
 const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, onLogout, user, onNewChat }) => {
@@ -190,10 +189,10 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <StatCard label="Messages" value={summary.message_count} />
                               <StatCard label="Trend"
-                                value={`${trendEmoji[summary.trend] || '📊'} ${summary.trend}`}
+                                value={summary.trend}
                                 className={trendColor[summary.trend] || 'text-purple-100'} />
-                              <StatCard label="Primary Emotion" value={capitalize(summary.primary_emotion)} icon={<FaHeart className="text-blue-400 text-xs" />} />
-                              <StatCard label="Main Concern" value={capitalize(summary.primary_category)} icon={<FaBrain className="text-green-400 text-xs" />} />
+                              <StatCard label="Primary Emotion" value={capitalize(summary.primary_emotion)} />
+                              <StatCard label="Main Concern" value={capitalize(summary.primary_category)} />
                             </div>
 
                             {/* Distress scores */}

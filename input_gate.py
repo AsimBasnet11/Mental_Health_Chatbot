@@ -110,7 +110,7 @@ CRISIS_RESPONSES = {
     "crisis_3": (
         "I am very concerned about your safety right now. "
         "Please reach out to a crisis helpline immediately. "
-        "You can call or text 988 (Suicide and Crisis Lifeline) right now. "
+        "You can call Nepal Mental Health Helpline: 1166 or Saathi Helpline: 1145 right now. "
         "You matter and help is available. Please do not face this alone."
     ),
 }
@@ -180,7 +180,7 @@ def check_input(user_message):
         return _gate("crisis_1", CRISIS_RESPONSES["crisis_1"], crisis_level=1)
 
     # ── Too short (< 4 words) ────────────────────────────────
-    if len(text.split()) < 4:
+    if len(text.split()) < 3:
         # If greeting/casual, already handled above
         # For all other short inputs, expand neutrally
         log.debug("Too short (expand neutrally): %r", text)

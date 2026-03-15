@@ -72,17 +72,25 @@ const HistoryPage = ({
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    let rel = '';
+    if (diffMins < 1) rel = 'Just now';
+    else if (diffMins < 60) rel = `${diffMins}m ago`;
+    else if (diffHours < 24) rel = `${diffHours}h ago`;
+    else if (diffDays < 7) rel = `${diffDays}d ago`;
+    else rel = date.toLocaleDateString();
+
+    // Absolute time: e.g., Mar 15, 2026, 14:32
+    const abs = date.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+    return `${rel} (${abs})`;
   };
 
   const handleContinue = (sessionId) => {
     const conv = conversations.find(c => c.session_id === sessionId);
-    const convType = conv?.conv_type || 'chat';
-    if (onContinueConversation) onContinueConversation(sessionId, convType);
+    // Always open chat page for continue (not voice)
+    if (onContinueConversation) onContinueConversation(sessionId, 'chat');
   };
 
   return (
@@ -236,10 +244,6 @@ const HistoryPage = ({
                   <p className="text-purple-300/50 text-xs">{selectedMessages.length} messages</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleContinue(selectedConv.session_id, 'chat')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-full text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-purple-600/30">
-                    <FaComments className="text-xs" /> Continue in Chat
-                  </button>
                   <button onClick={() => handleContinue(selectedConv.session_id, 'voice')}
                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 rounded-full text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-pink-600/30">
                     <FaMicrophone className="text-xs" /> Continue in Voice

@@ -23,11 +23,18 @@ const Sidebar = ({
   const handleClick = (item) => { setActive(item.label); item.onClick?.(); };
 
   return (
+
     <div className="w-40 h-screen bg-gradient-to-b from-[#0a0515] via-[#1a1035] to-[#0a0515] flex flex-col items-center py-4 gap-2 relative overflow-hidden">
 
       {/* Logo */}
       <div className="mb-1 relative shrink-0">
-        <img src={logo} alt="MindCare Logo" className="w-28 h-auto object-contain animate-logoGlow" />
+        <img
+          src={logo}
+          alt="MindCare Logo"
+          className="w-28 h-auto object-contain animate-logoGlow cursor-pointer"
+          onClick={() => window.location.reload()}
+          title="Refresh"
+        />
       </div>
 
       {/* New Chat Button */}

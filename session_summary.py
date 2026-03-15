@@ -50,7 +50,11 @@ def generate_session_summary(conversation_history):
 
     # 2. Most frequent mental health category
     categories = [m.get("category", "unknown") for m in user_messages if m.get("category")]
-    primary_category = Counter(categories).most_common(1)[0][0] if categories else "unknown"
+    non_normal = [c for c in categories if c.lower() != "normal"]
+    if non_normal:
+        primary_category = Counter(non_normal).most_common(1)[0][0]
+    else:
+        primary_category = Counter(categories).most_common(1)[0][0] if categories else "unknown"
 
     # 3. Emotional trend using *category_score* (clinical relevance)
     #    Higher category_score = more distress  →  decrease = Improved
@@ -84,7 +88,7 @@ def generate_session_summary(conversation_history):
     if risk_flags:
         recommendation = (
             "Suicidal signals were detected during this session. "
-            "We strongly recommend reaching out to a crisis helpline (988) "
+            "We strongly recommend reaching out to a crisis helpline in Nepal: 1166, 1145 "
             "or a trusted mental health professional immediately."
         )
     elif final_cat_score > 0.8:
@@ -92,7 +96,7 @@ def generate_session_summary(conversation_history):
     elif final_cat_score > 0.5:
         recommendation = "Consider speaking with a counselor for additional support."
     else:
-        recommendation = "Continue practicing self-care and healthy habits."
+        recommendation = "You're doing well. Keep practicing self-care and healthy habits."
 
     # 7. Total messages
     message_count = len(user_messages)
