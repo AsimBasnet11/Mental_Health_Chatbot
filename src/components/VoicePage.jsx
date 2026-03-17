@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaMicrophone, FaRedo, FaBrain, FaWifi, FaPlug, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
+import { API_BASE, ASR_WS_URL, ENDPOINTS } from '../config/api';
 import Sidebar from './Sidebar';
 
-const DEFAULT_WS_URL = localStorage.getItem('asr_ws_url') || "wss://vixenish-vihaan-unstrategically.ngrok-free.dev";
-const API_BASE = "http://localhost:8000";
+const DEFAULT_WS_URL = localStorage.getItem('asr_ws_url') || ASR_WS_URL;
+// API_BASE now imported from config/api.js
 
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
@@ -37,6 +38,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const currentPartialRef = useRef('');
   const isWaitingForFlushRef = useRef(false);
   const hasProcessedRef = useRef(false);
+  const lastFinalTimestampRef = useRef(0);
   const flushTimeoutRef = useRef(null);
 
   // Scroll to latest message
@@ -356,19 +358,21 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
             } else {
               accumulatedTextRef.current = finalText;
             }
-            
+
             console.log('[ACCUMULATED]:', accumulatedTextRef.current.length, 'chars');
-            
+            // Mark when a final chunk arrived
+            lastFinalTimestampRef.current = Date.now();
+
             // Clear partial since we have final
             setPartialTranscript('');
             currentPartialRef.current = '';
-            
-            // If we're waiting for flush and got final, process it
+
+            // If we're waiting for flush and got final, process it shortly
             if (isWaitingForFlushRef.current && !hasProcessedRef.current) {
-              console.log('[Voice] Got final after flush, processing...');
+              console.log('[Voice] Got final after flush, processing shortly...');
               setTimeout(() => {
                 processFinalMessage();
-              }, 500);
+              }, 100);
             }
           }
         }
@@ -453,6 +457,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     
     // Cancel any ongoing TTS so mic doesn't pick up bot voice
     window.speechSynthesis.cancel();
+    if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
     setIsSpeaking(false);
     
     console.log('[Voice] Starting new recording');
@@ -527,17 +532,27 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         console.error('[Voice] Flush failed:', e);
       }
       
-      // Set timeout - only process if we haven't already
+      // Set timeout - only process if we haven't already. Slightly extended
+      // to reduce races; if a final arrived very recently, wait a bit longer
       flushTimeoutRef.current = setTimeout(() => {
-        console.log('[Voice] Flush timeout (3s)');
-        
+        console.log('[Voice] Flush timeout (4s)');
+
         if (!hasProcessedRef.current) {
-          console.log('[Voice] No final after flush, processing available text');
-          processFinalMessage();
+          const now = Date.now();
+          const sinceLastFinal = now - (lastFinalTimestampRef.current || 0);
+          if (sinceLastFinal < 800) {
+            console.log('[Voice] Recent final arrived', sinceLastFinal, 'ms ago — delaying processing');
+            setTimeout(() => {
+              if (!hasProcessedRef.current) processFinalMessage();
+            }, 500);
+          } else {
+            console.log('[Voice] No recent final, processing available text');
+            processFinalMessage();
+          }
         } else {
           console.log('[Voice] Already processed, timeout skipped');
         }
-      }, 3000);
+      }, 4000);
     } else {
       // No WebSocket connection, process immediately
       console.log('[Voice] No WebSocket, processing immediately');
@@ -712,9 +727,6 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
                 style={{ maxWidth: '70%' }}
               >
                 {msg.text}
-                {msg.tags && (
-                  <div className="mt-2 pt-2 border-t border-purple-500/20 text-xs text-purple-400/70">{msg.tags}</div>
-                )}
               </div>
             </div>
           ))}

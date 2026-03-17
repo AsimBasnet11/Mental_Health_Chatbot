@@ -23,13 +23,13 @@ _HIGH_RISK_CATEGORIES = {"Suicidal", "Depression", "Bipolar"}
 
 _CRISIS_SYSTEM_ADDON = (
     " The user may be in distress. Prioritize safety — validate their feelings, "
-    "express genuine concern, and gently encourage contacting a crisis helpline (988) "
+    "express genuine concern, and gently encourage contacting a crisis helpline (Nepal: 1166 or 1145) "
     "or a trusted person. Do NOT minimize their pain."
 )
 
 
 def build_prompt(user_message, emotion, emotion_score, category, category_score,
-                 rag_example, conversation_history):
+                 conversation_history):
     """Build a combined prompt for the LLM.
 
     Args:
@@ -48,7 +48,7 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
     history_block = ""
     if conversation_history:
         history_lines = []
-        for msg in conversation_history[-8:]:
+        for msg in conversation_history:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             if role == "user":
@@ -56,14 +56,6 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
             else:
                 history_lines.append(f"Assistant: {content}")
         history_block = "\n".join(history_lines)
-
-    # Format RAG example (only if a match was returned)
-    rag_block = ""
-    if rag_example and rag_example.get("question"):
-        rag_block = (
-            f"Similar question: {rag_example.get('question', '')}\n"
-            f"Example response style (do NOT copy verbatim): {rag_example.get('answer', '')}"
-        )
 
     # Build the full prompt in Llama 3 instruct format
     emotion_pct = int(emotion_score * 100)
@@ -82,12 +74,6 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
         f"Detected Emotion: {emotion} (confidence: {emotion_pct}%)\n"
         f"Mental Health Category: {category} (confidence: {category_pct}%)\n\n"
     )
-
-    if rag_block:
-        prompt += (
-            f"REFERENCE EXAMPLE FROM THERAPY DATABASE:\n"
-            f"{rag_block}\n\n"
-        )
 
     if history_block:
         prompt += (

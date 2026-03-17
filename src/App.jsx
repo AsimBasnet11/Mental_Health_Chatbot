@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { API_BASE, ENDPOINTS } from './config/api';
 import Sidebar from './components/Sidebar';
 import ChatInputBar from './components/ChatInputBar';
 import VoicePage from './components/VoicePage';
@@ -9,7 +10,7 @@ import SessionSummaryPage from './components/SessionSummaryPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 
-const API_BASE = "http://localhost:8000";
+// API_BASE now imported from config/api.js
 
 function getToken() {
   return localStorage.getItem('token');
@@ -106,6 +107,7 @@ function App() {
         setVoiceContinueMessages(voiceMsgs);
         setCurrentPage('voice');
       } else {
+        // Always update messages and force Home to re-render with correct session
         setMessages(data.messages.map(m => ({ text: m.content, sender: m.role === 'user' ? 'user' : 'bot' })));
         setCurrentPage('home');
       }

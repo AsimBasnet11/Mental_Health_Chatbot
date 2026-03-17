@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FaFileAlt, FaArrowLeft, FaChevronDown, FaComments, FaClock, FaExclamationTriangle, FaHeart, FaBrain, FaChartLine } from 'react-icons/fa';
+import { API_BASE, ENDPOINTS } from '../config/api';
 import Sidebar from './Sidebar';
 
-const API_BASE = "http://localhost:8000";
+// API_BASE now imported from config/api.js
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
 
@@ -19,7 +20,6 @@ const formatDate = (timestamp) => {
   });
 };
 
-const trendEmoji = { 'Improved': '📉', 'Worsened': '📈', 'Stable': '➡️' };
 const trendColor = { 'Improved': 'text-green-400', 'Worsened': 'text-red-400', 'Stable': 'text-yellow-400' };
 
 const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, onLogout, user, onNewChat }) => {
@@ -190,7 +190,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <StatCard label="Messages" value={summary.message_count} />
                               <StatCard label="Trend"
-                                value={`${trendEmoji[summary.trend] || '📊'} ${summary.trend}`}
+                                value={summary.trend || 'N/A'}
                                 className={trendColor[summary.trend] || 'text-purple-100'} />
                               <StatCard label="Primary Emotion" value={capitalize(summary.primary_emotion)} icon={<FaHeart className="text-blue-400 text-xs" />} />
                               <StatCard label="Main Concern" value={capitalize(summary.primary_category)} icon={<FaBrain className="text-green-400 text-xs" />} />
@@ -240,7 +240,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                             {/* Recommendation */}
                             {summary.recommendation && (
                               <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl p-4 border border-purple-500/20">
-                                <div className="text-xs text-purple-400 uppercase tracking-wider mb-2">💡 Recommendation</div>
+                                <div className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recommendation</div>
                                 <p className="text-sm text-purple-200 leading-relaxed">{summary.recommendation}</p>
                               </div>
                             )}
@@ -254,7 +254,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
 
               {/* Disclaimer */}
               <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6 mt-6">
-                <h3 className="text-lg font-semibold text-purple-300 mb-3">💡 Remember</h3>
+                <h3 className="text-lg font-semibold text-purple-300 mb-3">Remember</h3>
                 <p className="text-purple-200 leading-relaxed">
                   These summaries are AI-generated interpretations. They should not replace professional mental health evaluation.
                   If you're in crisis, please contact a mental health professional or crisis hotline.

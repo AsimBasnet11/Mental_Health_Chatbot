@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import logo from '../assets/logo.png';
+import { API_BASE, ENDPOINTS } from '../config/api';
 
-const API_BASE = "http://localhost:8000";
+// API_BASE now imported from config/api.js
 
 const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
   const [name, setName]         = useState('');
@@ -26,9 +27,8 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.detail || 'Registration failed.'); return; }
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      onLoginSuccess(data.user);
+      // After registering, go to Sign In page (do not auto-login)
+      onGoLogin();
     } catch {
       setError('Cannot connect to server. Make sure backend is running.');
     } finally { setLoading(false); }

@@ -79,9 +79,10 @@ const HistoryPage = ({
     return date.toLocaleDateString();
   };
 
-  const handleContinue = (sessionId) => {
+  const handleContinue = (sessionId, forceType) => {
     const conv = conversations.find(c => c.session_id === sessionId);
-    const convType = conv?.conv_type || 'chat';
+    let convType = conv?.conv_type || 'chat';
+    if (forceType) convType = forceType;
     if (onContinueConversation) onContinueConversation(sessionId, convType);
   };
 
@@ -236,14 +237,6 @@ const HistoryPage = ({
                   <p className="text-purple-300/50 text-xs">{selectedMessages.length} messages</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleContinue(selectedConv.session_id, 'chat')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-full text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-purple-600/30">
-                    <FaComments className="text-xs" /> Continue in Chat
-                  </button>
-                  <button onClick={() => handleContinue(selectedConv.session_id, 'voice')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 rounded-full text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-pink-600/30">
-                    <FaMicrophone className="text-xs" /> Continue in Voice
-                  </button>
                   <button onClick={() => { setSelectedConv(null); setSelectedMessages([]); }}
                     className="p-2 hover:bg-purple-600/20 rounded-full transition-all text-purple-300/60 hover:text-white text-sm">
                     ✕

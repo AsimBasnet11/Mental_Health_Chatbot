@@ -12,7 +12,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "How does the voice recognition work?",
-      answer: "We use Whisper large-v3, a state-of-the-art speech recognition model, running on GPU for real-time transcription. It's optimized for South Asian accents and achieves 95-98% accuracy."
+      answer: "We use Whisper medium, a speech recognition model optimized \nfor South Asian accents, running in real-time for accurate \ntranscription. It includes a hallucination filter to remove \nfalse transcriptions and a filler word remover for cleaner text."
     },
     {
       question: "How is my mental state analyzed?",
@@ -20,7 +20,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "Is my data private and secure?",
-      answer: "Your analysis data is stored locally in your browser's localStorage. It never leaves your device unless you explicitly share it. The voice data is processed in real-time and not permanently stored on our servers."
+      answer: "Your data is securely stored on our server with JWT \nauthentication. Each user has their own private conversation \nhistory. Voice data is processed in real-time and not \npermanently stored on our servers."
     },
     {
       question: "Can this replace professional therapy?",
@@ -36,11 +36,11 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "Can I view my analysis history?",
-      answer: "Yes! Click on the 'History' button in the sidebar to see your past 10 analyses, including timestamps, emotions detected, and mental health states."
+      answer: "Yes! Click on the History button in the sidebar to see \nyour full conversation history including timestamps, \nemotions detected, and mental health states. You can also \ncontinue any past conversation from the history page."
     },
     {
       question: "What should I do if I'm feeling suicidal?",
-      answer: "If you're experiencing suicidal thoughts, please seek immediate help. Contact a crisis hotline: National Suicide Prevention Lifeline (US): 988 or 1-800-273-8255. International: Find your country's hotline at findahelpline.com"
+      answer: "If you're experiencing suicidal thoughts, please seek \nimmediate help. Nepal Mental Health Helpline: 1166 \n(TPO Nepal) or Saathi Helpline: 1145. You are not alone \n— help is available 24/7. You can also visit your nearest \nhospital emergency department immediately."
     },
     {
       question: "How can I improve the accuracy of voice recognition?",
@@ -78,41 +78,14 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
                 height: `${Math.random() * 3 + 1}px`,
                 top: `${Math.random() * 100}%`,
                 left: `${Math.random() * 100}%`,
+
                 animationDuration: `${Math.random() * 3 + 2}s`
               }}
             />
           ))}
         </div>
-
-        {/* Header */}
-        <div className="relative z-10 p-6 border-b border-purple-500/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FaQuestionCircle className="text-3xl text-purple-400" />
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Frequently Asked Questions
-                </h1>
-                <p className="text-sm text-purple-300/60">Everything you need to know</p>
-              </div>
-            </div>
-            
-            <button 
-              onClick={onBack}
-              className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all flex items-center gap-2"
-            >
-              <FaArrowLeft />
-              Back
-            </button>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-6 relative z-10">
-          
-          <div className="max-w-4xl mx-auto space-y-4">
-            
-            {faqs.map((faq, index) => (
+        <div className="max-w-4xl mx-auto space-y-4">
+          {faqs.map((faq, index) => (
               <div 
                 key={index}
                 className="bg-[#1a1035]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
@@ -159,12 +132,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
                 If you need additional help or have questions not covered here, please don't hesitate to reach out.
               </p>
               <div className="flex gap-4">
-                <a
-                  href="mailto:support@mindcare.com"
-                  className="px-6 py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-full transition-all"
-                >
-                  Contact Support
-                </a>
+                {/* Contact Support button removed as requested */}
                 <button
                   onClick={onBack}
                   className="px-6 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all"
@@ -178,7 +146,6 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         </div>
 
       </div>
-    </div>
   );
 };
 

@@ -1,3 +1,4 @@
+import { API_BASE, ENDPOINTS } from '../config/api';
 import React, { useState, useEffect, useMemo } from 'react';
 import { FaBrain, FaHeart, FaHistory, FaArrowLeft, FaQuoteLeft, FaChartLine, FaChevronDown, FaComments, FaClock, FaChartBar, FaChartPie } from 'react-icons/fa';
 import {
@@ -438,7 +439,7 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
   const [expandedPastSession, setExpandedPastSession] = useState(null);
   const [expandedPastMessages, setExpandedPastMessages] = useState(null);
 
-  const API_BASE = "http://localhost:8000";
+  // API_BASE now imported from config/api.js
   const getToken = () => localStorage.getItem('token');
 
   useEffect(() => {

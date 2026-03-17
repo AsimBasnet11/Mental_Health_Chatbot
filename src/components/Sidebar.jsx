@@ -27,7 +27,7 @@ const Sidebar = ({
 
       {/* Logo */}
       <div className="mb-1 relative shrink-0">
-        <img src={logo} alt="MindCare Logo" className="w-28 h-auto object-contain animate-logoGlow" />
+        <img src={logo} alt="MindCare Logo" onClick={() => window.location.reload()} className="w-28 h-auto object-contain animate-logoGlow cursor-pointer" />
       </div>
 
       {/* New Chat Button */}

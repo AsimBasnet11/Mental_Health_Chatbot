@@ -52,7 +52,7 @@ CRISIS_RESOURCES = (
 )
 
 # Hard cap so the bot doesn't ramble
-_MAX_RESPONSE_WORDS = 120
+_MAX_RESPONSE_WORDS = 150
 
 
 def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
@@ -99,11 +99,11 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
             response = " ".join(parts)
 
     # Rule 4 — Low Confidence Handler
-    if emotion_score < 0.5 or category_score < 0.5:
+    if (emotion_score < 0.5 or category_score < 0.5) and len(response.split()) < 40:
         response = response.rstrip() + " " + LOW_CONFIDENCE_FOLLOWUP
 
     # Rule 5 — Response Too Short (less than 20 words)
-    if len(response.split()) < 20:
+    if len(response.split()) < 10:
         response = response.rstrip()
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"

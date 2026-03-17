@@ -8,12 +8,11 @@ finalized model/
 ├── pipeline.py                 # Full pipeline connecting all components
 ├── conversation_history.py     # Conversation history manager
 ├── input_gate.py               # Input gate / filter with 3 crisis levels
-├── rag_search.py               # RAG search using sentence-transformers
 ├── prompt_builder.py           # Prompt builder for Llama 3 instruct
 ├── llm_responder.py            # LLM response generator (local or remote Colab)
 ├── safety_guardrails.py        # Post-response safety rules
 ├── session_summary.py          # Rule-based session summary
-├── rag_data.json               # Therapy Q&A pairs for RAG
+<!-- RAG removed from project -->
 ├── requirements.txt            # Python dependencies
 ├── detection.py                # Emotion + mental health model inference module
 ├── Counselor_Llama3_Q4.gguf    # Fine-tuned LLM model file (4.58 GB)

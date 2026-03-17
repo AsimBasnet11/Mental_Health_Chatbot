@@ -447,7 +447,7 @@ def summary(body: SummaryIn):
 @app.get("/health")
 def health():
     """Enhanced health check — reports model & DB status."""
-    from pipeline import _rag_search, _llm_responder
+    from pipeline import _llm_responder
     from detection import _sentiment_model, _emotion_model
     db_ok = False
     try:
@@ -462,7 +462,7 @@ def health():
         "models": {
             "sentiment": _sentiment_model is not None,
             "emotion":   _emotion_model is not None,
-            "rag":       _rag_search is not None,
+            "rag":       False,
             "llm":       _llm_responder is not None,
         },
         "database": db_ok,
@@ -482,12 +482,7 @@ async def warmup_models():
         log.info("Detection models loaded")
     except Exception as e:
         log.error("Detection model warmup failed: %s", e)
-    try:
-        from pipeline import _get_rag_search
-        _get_rag_search()
-        log.info("RAG search loaded")
-    except Exception as e:
-        log.error("RAG warmup failed: %s", e)
+    # RAG removed — no warmup required
     log.info("Warmup complete")
 
 
