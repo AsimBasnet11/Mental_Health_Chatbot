@@ -146,7 +146,7 @@ class SummaryIn(BaseModel):
     session_id: str = "default"
 class TTSIn(BaseModel):
     text: str
-    voice: str = "en-US-JennyNeural"
+    voice: str = "en-US-SaraNeural"
 
 
 # ── Session store with TTL-based cleanup (#6) ───────────────
@@ -335,7 +335,7 @@ async def tts(body: TTSIn):
         raise HTTPException(400, "Text cannot be empty.")
     text = body.text.strip()[:2000]  # Limit length
     try:
-        communicate = edge_tts.Communicate(text, body.voice, rate="+10%")
+        communicate = edge_tts.Communicate(text, body.voice, rate="-5%", pitch="+5Hz")
         audio_buffer = io.BytesIO()
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":

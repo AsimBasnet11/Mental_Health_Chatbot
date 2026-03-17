@@ -32,7 +32,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "How accurate is the mental health analysis?",
-      answer: "The system achieves 85-95% accuracy depending on the clarity of speech and emotional expression. We use enhanced keyword detection and bias correction to improve anxiety vs. stress classification accuracy."
+      answer: "The system uses AI models that are continuously improved; performance depends on speech clarity and emotional expression. Results are indicative and meant to support self-reflection, not to replace professional diagnosis. We apply keyword detection and bias correction to improve classification robustness."
     },
     {
       question: "Can I view my analysis history?",
@@ -54,8 +54,8 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
 
   return (
     <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
-      
-      <Sidebar 
+
+      <Sidebar
         onHomeClick={onHomeClick}
         onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick}
@@ -70,23 +70,50 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         {/* Animated Stars Background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(100)].map((_, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className="absolute bg-white rounded-full opacity-20 animate-pulse"
               style={{
                 width: `${Math.random() * 3 + 1}px`,
                 height: `${Math.random() * 3 + 1}px`,
                 top: `${Math.random() * 100}%`,
                 left: `${Math.random() * 100}%`,
-
                 animationDuration: `${Math.random() * 3 + 2}s`
               }}
             />
           ))}
         </div>
-        <div className="max-w-4xl mx-auto space-y-4">
-          {faqs.map((faq, index) => (
-              <div 
+
+        {/* Header */}
+        <div className="relative z-10 p-6 border-b border-purple-500/20 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FaQuestionCircle className="text-3xl text-purple-400" />
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  FAQs
+                </h1>
+                <p className="text-sm text-purple-300/60">Frequently asked questions</p>
+              </div>
+            </div>
+            <button onClick={onBack}
+              className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all flex items-center gap-2">
+              <FaArrowLeft /> Back
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable content */}
+        <div
+          className="flex-1 overflow-y-auto p-6 relative z-10"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+          }}
+        >
+          <div className="max-w-4xl mx-auto space-y-4">
+            {faqs.map((faq, index) => (
+              <div
                 key={index}
                 className="bg-[#1a1035]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
               >
@@ -115,7 +142,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
                 {/* Answer */}
                 {openIndex === index && (
                   <div className="px-6 pb-4 pt-2 bg-[#0a0515]/50 border-t border-purple-500/20">
-                    <p className="text-purple-300/90 leading-relaxed">
+                    <p className="text-purple-300/90 leading-relaxed whitespace-pre-line">
                       {faq.answer}
                     </p>
                   </div>
@@ -131,21 +158,18 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
               <p className="text-purple-200 mb-4">
                 If you need additional help or have questions not covered here, please don't hesitate to reach out.
               </p>
-              <div className="flex gap-4">
-                {/* Contact Support button removed as requested */}
-                <button
-                  onClick={onBack}
-                  className="px-6 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all"
-                >
-                  Back to Home
-                </button>
-              </div>
+              <button
+                onClick={onBack}
+                className="px-6 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all"
+              >
+                Back to Home
+              </button>
             </div>
-
           </div>
         </div>
 
       </div>
+    </div>
   );
 };
 

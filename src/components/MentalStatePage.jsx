@@ -69,11 +69,23 @@ const getMentalBg = (state) => {
   return colors[state?.toLowerCase()] || '#a78bfa';
 };
 
+// Root cause fix: backend saves timestamps without 'Z' (e.g. "2026-03-17T11:35:00").
+// Without 'Z', JavaScript treats the string as LOCAL time instead of UTC,
+// causing displayed times to be off by the local UTC offset (e.g. -5:45 for Nepal).
+// Appending 'Z' forces JS to parse as UTC, then toLocaleString converts to NPT correctly.
+const parseTimestamp = (ts) => {
+  if (!ts) return new Date(NaN);
+  const s = String(ts);
+  const hasOffset = s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s);
+  return new Date(hasOffset ? s : s + 'Z');
+};
+
 const formatDate = (timestamp) => {
-  const date = new Date(timestamp);
+  const date = parseTimestamp(timestamp);
   return date.toLocaleString('en-US', {
     month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Kathmandu',
   });
 };
 
@@ -119,7 +131,6 @@ const aggregateSession = (messages) => {
 
   let topMentalLabel = 'Unknown', topMentalConf = 0;
 
-  // Prioritize non-normal categories — if any exist, show that over normal
   const nonNormalScores = Object.entries(avgMentalScores)
     .filter(([label]) => label.toLowerCase() !== 'normal');
 
@@ -257,7 +268,6 @@ const SessionTrendGraph = ({ messages }) => {
               tickLine={false}
               label={{ value: 'Message #', position: 'insideBottomRight', offset: -5, fill: '#a78bfa', fontSize: 11 }}
             />
-            {/* FIX 1: domain auto so chart zooms into actual data range */}
             <YAxis
               domain={['auto', 'auto']}
               tick={{ fill: '#c4b5fd', fontSize: 12 }}
@@ -274,7 +284,6 @@ const SessionTrendGraph = ({ messages }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* FIX 3: Legend now shows trend values inline */}
       <div className="flex items-center gap-6 mt-3 text-xs text-purple-300/70">
         <span className="flex items-center gap-1.5">
           <span className="w-4 h-0.5 bg-purple-500 rounded-full inline-block" />
@@ -388,7 +397,6 @@ const EmotionDistributionChart = ({ emotionMap }) => {
       <div className="w-full h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            {/* FIX 2: label={false} — legend below instead of overlapping labels */}
             <Pie
               data={data}
               dataKey="value"
@@ -411,7 +419,6 @@ const EmotionDistributionChart = ({ emotionMap }) => {
         </ResponsiveContainer>
       </div>
 
-      {/* Legend below — no overlap */}
       <div className="flex flex-wrap gap-2 mt-3 justify-center">
         {data.map((entry, i) => (
           <span key={i} className="flex items-center gap-1.5 text-xs text-purple-200">
@@ -439,7 +446,6 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
   const [expandedPastSession, setExpandedPastSession] = useState(null);
   const [expandedPastMessages, setExpandedPastMessages] = useState(null);
 
-  // API_BASE now imported from config/api.js
   const getToken = () => localStorage.getItem('token');
 
   useEffect(() => {
@@ -475,7 +481,7 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
     if (!currentSessionId) return [];
     return analysisHistory
       .filter(item => (item.sessionId || item.session_id) === currentSessionId)
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      .sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
   }, [analysisHistory, currentSessionId]);
 
   const sessionResult = useMemo(
@@ -489,13 +495,13 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
       const sid = item.sessionId || item.session_id;
       return sid !== currentSessionId;
     });
-    const sorted = [...others].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const sorted = [...others].sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
     const map = new Map();
     let legacyIdx = 0, lastLegacyKey = null, lastLegacyTime = 0;
     sorted.forEach((item) => {
       let key = item.sessionId || item.session_id;
       if (!key) {
-        const t = new Date(item.timestamp).getTime();
+        const t = parseTimestamp(item.timestamp).getTime();
         if (!lastLegacyKey || t - lastLegacyTime > SESSION_GAP_MS) { legacyIdx++; lastLegacyKey = `__legacy_${legacyIdx}`; }
         lastLegacyTime = t; key = lastLegacyKey;
       }

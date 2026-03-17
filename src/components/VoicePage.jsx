@@ -21,6 +21,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const [wsUrl, setWsUrl] = useState(DEFAULT_WS_URL);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  const ttsEnabledRef = useRef(true); // ref so speakResponse always reads latest value
   const [isSpeaking, setIsSpeaking] = useState(false);
   
   // Connection status state
@@ -32,6 +33,10 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const mediaStreamRef = useRef(null);
   const processorRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const manualDisconnectRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef(null);
+  const MAX_RECONNECT_ATTEMPTS = 6;
   
   // Text accumulation
   const accumulatedTextRef = useRef('');
@@ -66,17 +71,21 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     }
   }, []);
 
-  // Automatically connect to server on mount, disconnect on unmount or session end
+  // Auto-connect on mount if a WS URL is available. Use robust reconnect/backoff
+  // when the socket closes unexpectedly. Manual disconnects (via button)
+  // set `manualDisconnectRef` so we don't auto-reconnect.
   useEffect(() => {
-    if (!isConnected && !sessionEnded) {
+    manualDisconnectRef.current = false;
+    if (wsUrl && wsUrl.trim()) {
       connectToServer();
     }
     return () => {
+      manualDisconnectRef.current = true;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       disconnectFromServer();
     };
-    // Only run on mount/unmount and when session ends
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionEnded]);
+  }, []);
 
   // Request microphone permission
   const requestPermission = async () => {
@@ -108,7 +117,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   const ttsAudioRef = useRef(null);
 
   const speakResponse = async (text) => {
-    if (!ttsEnabled || !text) return;
+    // Always check ref — never stale even inside async callbacks
+    if (!ttsEnabledRef.current || !text) return;
 
     // Stop any current playback
     if (ttsAudioRef.current) {
@@ -119,11 +129,18 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
     try {
       setIsSpeaking(true);
-      const res = await fetch(`${API_BASE}/api/tts`, {
+      const res = await fetch(`${API_BASE}${ENDPOINTS.TTS}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "en-US-JennyNeural" })
+        // en-US-AriaNeural — warm, natural, human-like female voice
+        body: JSON.stringify({ text, voice: "en-US-AriaNeural" })
       });
+
+      // Check again after async — user may have toggled off while fetching
+      if (!ttsEnabledRef.current) {
+        setIsSpeaking(false);
+        return;
+      }
 
       if (!res.ok) throw new Error("TTS failed");
 
@@ -147,10 +164,25 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     } catch (err) {
       console.error('[TTS] Backend TTS failed, falling back to browser:', err);
       setIsSpeaking(false);
-      // Fallback to browser TTS
+      // Check again before browser fallback
+      if (!ttsEnabledRef.current) return;
+      // Fallback to browser TTS — most human-like female voice available
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.92;
-      utterance.pitch = 1.05;
+      utterance.rate = 0.88;
+      utterance.pitch = 1.1;
+      utterance.volume = 1.0;
+      // Try to pick a female voice
+      const voices = window.speechSynthesis.getVoices();
+      const femaleVoice = voices.find(v =>
+        v.name.includes('Female') ||
+        v.name.includes('Samantha') ||
+        v.name.includes('Karen') ||
+        v.name.includes('Moira') ||
+        v.name.includes('Aria') ||
+        v.name.includes('Jenny') ||
+        (v.name.includes('Google') && v.name.includes('US') && v.lang === 'en-US')
+      );
+      if (femaleVoice) utterance.voice = femaleVoice;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
@@ -325,6 +357,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
     console.log('[WS] Connecting to server...');
     setConnectionStatus('connecting');
+    manualDisconnectRef.current = false;
     
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
@@ -333,6 +366,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       console.log('[WS] Connected');
       setConnectionStatus('connected');
       setIsConnected(true);
+      reconnectAttemptsRef.current = 0;
+      if (reconnectTimeoutRef.current) { clearTimeout(reconnectTimeoutRef.current); reconnectTimeoutRef.current = null; }
     };
     
     ws.onmessage = (event) => {
@@ -392,11 +427,25 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       setConnectionStatus('error');
     };
     
-    ws.onclose = () => {
-      console.log('[WS] Closed');
+    ws.onclose = (ev) => {
+      console.log('[WS] Closed', ev);
       setConnectionStatus('disconnected');
       setIsConnected(false);
       wsRef.current = null;
+      // If user didn't manually disconnect, attempt reconnect with backoff
+      if (!manualDisconnectRef.current) {
+        const attempts = reconnectAttemptsRef.current || 0;
+        if (attempts < MAX_RECONNECT_ATTEMPTS) {
+          const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
+          reconnectAttemptsRef.current = attempts + 1;
+          console.log('[WS] Scheduling reconnect in', delay, 'ms (attempt', reconnectAttemptsRef.current + ')');
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectToServer();
+          }, delay);
+        } else {
+          console.warn('[WS] Max reconnect attempts reached; not reconnecting automatically');
+        }
+      }
     };
 
     wsRef.current = ws;
@@ -404,10 +453,14 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
   // Disconnect from server
   const disconnectFromServer = () => {
+    manualDisconnectRef.current = true;
     if (isListening) {
       stopRecording();
     }
-    
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     if (wsRef.current) {
       console.log('[WS] Disconnecting...');
       try {
@@ -415,7 +468,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       } catch (e) {
         console.error('Error sending close:', e);
       }
-      wsRef.current.close();
+      try { wsRef.current.close(); } catch (e) { /* ignore */ }
       wsRef.current = null;
     }
     setConnectionStatus('disconnected');
@@ -692,7 +745,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
             {/* TTS Toggle */}
             <button
-              onClick={() => { setTtsEnabled(prev => { if (prev) { window.speechSynthesis.cancel(); if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; } } return !prev; }); setIsSpeaking(false); }}
+              onClick={() => { setTtsEnabled(prev => { const next = !prev; ttsEnabledRef.current = next; if (!next) { window.speechSynthesis.cancel(); if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; } } return next; }); setIsSpeaking(false); }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
                 ${ttsEnabled
                   ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'
@@ -821,11 +874,17 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           </div>
 
           <div className="mt-4 text-xs text-purple-300/60 text-center px-4">
-            {!isConnected && (
+            {connectionStatus === 'connecting' && (
+              <div className="text-yellow-400 mb-2 font-bold">Connecting to server...</div>
+            )}
+            {connectionStatus === 'disconnected' && (
               <div className="text-yellow-400 mb-2 font-bold">Click "Connect Server" to enable voice recording.</div>
             )}
-            {isConnected && (
+            {connectionStatus === 'connected' && (
               <div className="text-green-400 mb-2">Server connected — you can record multiple times.</div>
+            )}
+            {connectionStatus === 'error' && (
+              <div className="text-red-400 mb-2">Connection error — try reconnecting.</div>
             )}
             {isSpeaking && (
               <div className="text-purple-300 mb-1 animate-pulse">Speaking...</div>

@@ -52,7 +52,7 @@ CRISIS_RESOURCES = (
 )
 
 # Hard cap so the bot doesn't ramble
-_MAX_RESPONSE_WORDS = 150
+_MAX_RESPONSE_WORDS = 80
 
 
 def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
@@ -108,10 +108,17 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"
 
-    # Rule 6 — Response Too Long — trim to _MAX_RESPONSE_WORDS
+    # Rule 6 — Response Too Long — trim at complete sentence boundary
     words = response.split()
     if len(words) > _MAX_RESPONSE_WORDS:
-        response = " ".join(words[:_MAX_RESPONSE_WORDS]).rstrip(".,;: ") + "."
+        sentences = re.split(r'(?<=[.!?])\s+', response)
+        trimmed = ""
+        for sentence in sentences:
+            if len((trimmed + " " + sentence).split()) <= _MAX_RESPONSE_WORDS:
+                trimmed = (trimmed + " " + sentence).strip()
+            else:
+                break
+        response = trimmed if trimmed else sentences[0]
 
     # Rule 7 — Safe Closing (disabled — frontend handles this after 3rd message)
     # if category_score > 0.85:

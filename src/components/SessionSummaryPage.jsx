@@ -3,7 +3,6 @@ import { FaFileAlt, FaArrowLeft, FaChevronDown, FaComments, FaClock, FaExclamati
 import { API_BASE, ENDPOINTS } from '../config/api';
 import Sidebar from './Sidebar';
 
-// API_BASE now imported from config/api.js
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
 
@@ -12,11 +11,21 @@ const capitalize = (str) => {
   return str.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 };
 
+// Backend sends timestamps without 'Z' (e.g. "2026-03-17T11:35:00"), so JS
+// treats them as local time instead of UTC. Appending 'Z' forces correct UTC parsing.
+const parseTimestamp = (ts) => {
+  if (!ts) return new Date(NaN);
+  const s = String(ts);
+  const hasOffset = s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s);
+  return new Date(hasOffset ? s : s + 'Z');
+};
+
 const formatDate = (timestamp) => {
-  const date = new Date(timestamp);
+  const date = parseTimestamp(timestamp);
   return date.toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Kathmandu',
   });
 };
 
@@ -24,15 +33,12 @@ const trendColor = { 'Improved': 'text-green-400', 'Worsened': 'text-red-400', '
 
 const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onFAQsClick, onSummaryClick, onLogout, user, onNewChat }) => {
   const [conversations, setConversations] = useState([]);
-  const [summaries, setSummaries] = useState({});       // sessionId -> summary data
+  const [summaries, setSummaries] = useState({});
   const [loadingMain, setLoadingMain] = useState(true);
   const [loadingSummary, setLoadingSummary] = useState({});
   const [expandedSession, setExpandedSession] = useState(null);
 
-  // Load all conversations
-  useEffect(() => {
-    loadConversations();
-  }, []);
+  useEffect(() => { loadConversations(); }, []);
 
   const loadConversations = async () => {
     setLoadingMain(true);
@@ -47,9 +53,8 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
     } finally { setLoadingMain(false); }
   };
 
-  // Generate summary for a session (on demand)
   const generateSummary = async (sessionId) => {
-    if (summaries[sessionId]) return; // already have it
+    if (summaries[sessionId]) return;
     setLoadingSummary(prev => ({ ...prev, [sessionId]: true }));
     try {
       const res = await fetch(`${API_BASE}/api/summary`, {
@@ -91,7 +96,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
       />
 
       <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
-        {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
             <div key={i} className="absolute bg-white rounded-full opacity-20 animate-pulse"
@@ -103,7 +107,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
           ))}
         </div>
 
-        {/* Header */}
         <div className="relative z-10 p-6 border-b border-purple-500/20 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -124,7 +127,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 relative z-10">
           {loadingMain ? (
             <div className="flex items-center justify-center h-full">
@@ -151,7 +153,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                   <div key={conv.session_id}
                     className="bg-[#1a1035]/60 border border-purple-500/20 rounded-2xl backdrop-blur-md hover:border-purple-500/40 transition-all overflow-hidden">
 
-                    {/* Session header */}
                     <button
                       onClick={() => toggleSession(conv.session_id)}
                       className="w-full flex items-center justify-between p-5 text-left cursor-pointer"
@@ -173,7 +174,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                       />
                     </button>
 
-                    {/* Expanded summary */}
                     {isOpen && (
                       <div className="px-5 pb-5 animate-fadeIn">
                         {isLoading ? (
@@ -186,7 +186,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                           <div className="text-center py-6 text-purple-300/50">No messages to summarize in this session.</div>
                         ) : summary ? (
                           <div className="space-y-4">
-                            {/* Stats grid */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <StatCard label="Messages" value={summary.message_count} />
                               <StatCard label="Trend"
@@ -196,21 +195,18 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                               <StatCard label="Main Concern" value={capitalize(summary.primary_category)} icon={<FaBrain className="text-green-400 text-xs" />} />
                             </div>
 
-                            {/* Distress scores */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                               <DistressBar label="Start Distress" value={Math.round((summary.start_score || 0) * 100)} />
                               <DistressBar label="Avg Distress" value={Math.round((summary.avg_distress || 0) * 100)} />
                               <DistressBar label="End Distress" value={Math.round((summary.end_score || 0) * 100)} />
                             </div>
 
-                            {/* Top emotions */}
                             {(summary.top_emotions || []).length > 0 && (
                               <div className="bg-[#0a0515]/40 rounded-xl p-4 border border-purple-500/10">
                                 <div className="text-xs text-purple-400/70 uppercase tracking-wider mb-2">Top Emotions</div>
                                 <div className="flex flex-wrap gap-2">
                                   {summary.top_emotions.map((e, i) => (
                                     <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-600/20 border border-purple-500/20 text-xs text-purple-200">
-                                      <FaHeart className="text-[10px] text-pink-400" />
                                       {capitalize(e.emotion)}
                                       <span className="text-purple-400/60">×{e.count}</span>
                                     </span>
@@ -219,7 +215,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                               </div>
                             )}
 
-                            {/* Risk flags */}
                             {(summary.risk_flags || []).length > 0 && (
                               <div className="bg-red-900/20 rounded-xl p-4 border border-red-500/20">
                                 <div className="flex items-center gap-2 text-xs text-red-400 uppercase tracking-wider mb-3">
@@ -237,7 +232,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                               </div>
                             )}
 
-                            {/* Recommendation */}
                             {summary.recommendation && (
                               <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl p-4 border border-purple-500/20">
                                 <div className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recommendation</div>
@@ -252,7 +246,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                 );
               })}
 
-              {/* Disclaimer */}
               <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6 mt-6">
                 <h3 className="text-lg font-semibold text-purple-300 mb-3">Remember</h3>
                 <p className="text-purple-200 leading-relaxed">
@@ -268,7 +261,6 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
   );
 };
 
-/* ── Small reusable components ── */
 const StatCard = ({ label, value, className = 'text-purple-100', icon }) => (
   <div className="bg-[#0a0515]/40 rounded-xl p-3 border border-purple-500/10">
     <div className="flex items-center gap-1.5 mb-1">

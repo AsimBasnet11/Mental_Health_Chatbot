@@ -93,9 +93,52 @@ _CONTRACTIONS = {
 
 # ── Fixed responses ──────────────────────────────────────────
 GREETING_RESPONSE = (
-    "Hello! I'm Aria, your mental health support companion. "
-    "I'm here to listen and support you. How are you feeling today?"
+    "Hi there! I'm Aria, your mental health support companion. "
+    "I'm here to listen and support you. "
+    "How are you feeling today?"
 )
+
+# ── Specific casual responses ─────────────────────────────────
+CASUAL_RESPONSES = {
+    "how are you": (
+        "I'm here and ready to listen! "
+        "More importantly — how are YOU feeling today?"
+    ),
+    "how are you doing": (
+        "I'm doing well, thank you for asking! "
+        "How are you feeling today?"
+    ),
+    "who are you": (
+        "I'm Aria, your mental health support companion. "
+        "I'm here to listen and support you through whatever you're going through. "
+        "What's on your mind today?"
+    ),
+    "what are you": (
+        "I'm Aria, an AI mental health companion. "
+        "I'm here to listen, support, and guide you. "
+        "How are you feeling today?"
+    ),
+    "bye": (
+        "Take care of yourself! "
+        "Remember, I'm always here whenever you need to talk. "
+        "Goodbye!"
+    ),
+    "goodbye": (
+        "Take care of yourself! "
+        "Remember, I'm always here whenever you need to talk. "
+        "Goodbye!"
+    ),
+    "thanks": (
+        "You're welcome! "
+        "I'm always here if you need to talk. "
+        "How are you feeling?"
+    ),
+    "thank you": (
+        "You're welcome! "
+        "I'm always here if you need to talk. "
+        "How are you feeling?"
+    ),
+}
 
 CRISIS_RESPONSES = {
     "crisis_1": (
@@ -107,10 +150,10 @@ CRISIS_RESPONSES = {
         "Take a slow deep breath with me. You are not alone in this. "
         "Would you like to try a quick grounding exercise together?"
     ),
-        "crisis_3": (
-            "I am very concerned about your safety right now. "
-            "Please reach out to a crisis helpline immediately. "
-            "You can call Nepal Mental Health Helpline: 1166 or Saathi Helpline: 1145 right now. "
+    "crisis_3": (
+        "I am very concerned about your safety right now. "
+        "Please reach out to a crisis helpline immediately. "
+        "You can call or text 988 (Suicide and Crisis Lifeline) right now. "
         "You matter and help is available. Please do not face this alone."
     ),
 }
@@ -164,6 +207,10 @@ def check_input(user_message):
     # ── Greetings ─────────────────────────────────────────────
     if stripped in GREETING_WORDS or text in GREETING_WORDS:
         log.debug("Greeting: %r", text)
+        # Check for specific casual response first
+        for phrase, resp in CASUAL_RESPONSES.items():
+            if stripped == phrase or text == phrase:
+                return _gate("greeting", resp)
         return _gate("greeting", GREETING_RESPONSE)
 
     # ── Crisis — highest severity first ───────────────────────

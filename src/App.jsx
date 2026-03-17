@@ -10,8 +10,6 @@ import SessionSummaryPage from './components/SessionSummaryPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 
-// API_BASE now imported from config/api.js
-
 function getToken() {
   return localStorage.getItem('token');
 }
@@ -26,7 +24,7 @@ function App() {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
   });
-  const [authPage, setAuthPage] = useState('login'); // 'login' | 'register'
+  const [authPage, setAuthPage] = useState('login');
 
   // ─── Chat state ───
   const [messages, setMessages] = useState([]);
@@ -38,11 +36,25 @@ function App() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [voiceContinueMessages, setVoiceContinueMessages] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  // Auto-scroll
+  const scrollToBottom = (behavior = 'smooth') => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }, 50);
+  };
+
+  // Auto-scroll on new messages or typing indicator
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom('smooth');
   }, [messages, isTyping]);
+
+  // Scroll to bottom when returning to home page
+  useEffect(() => {
+    if (currentPage === 'home') {
+      scrollToBottom('instant');
+    }
+  }, [currentPage]);
 
   // Welcome message
   useEffect(() => {
@@ -107,7 +119,6 @@ function App() {
         setVoiceContinueMessages(voiceMsgs);
         setCurrentPage('voice');
       } else {
-        // Always update messages and force Home to re-render with correct session
         setMessages(data.messages.map(m => ({ text: m.content, sender: m.role === 'user' ? 'user' : 'bot' })));
         setCurrentPage('home');
       }
@@ -123,7 +134,6 @@ function App() {
     if (!text.trim()) return;
     setIsAnalyzing(true);
     try {
-      // Full pipeline chat (handles analysis + response + saves to DB)
       const chatRes = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -135,7 +145,6 @@ function App() {
       setIsAnalyzing(false);
       setIsTyping(false);
 
-      // Detection removed from chat — handled by Mental State page
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
@@ -183,6 +192,14 @@ function App() {
     analyzeText(userMessage);
   };
 
+  // ─── Clear history → also reset current chat ───
+  const handleHistoryClear = () => {
+    sessionIdRef.current = 'session_' + Date.now();
+    setMessages([]);
+    setSessionEnded(false);
+    showWelcome();
+  };
+
   // ─── Navigation ───
   const handleHomeClick        = () => setCurrentPage('home');
   const handleVoiceClick = () => {
@@ -211,7 +228,7 @@ function App() {
     return <MentalStatePage onBack={handleHomeClick} {...navProps} currentSessionId={sessionIdRef.current} />;
   }
   if (currentPage === 'history') {
-    return <HistoryPage onBack={handleHomeClick} {...navProps} onContinueConversation={handleContinueConversation} />;
+    return <HistoryPage onBack={handleHomeClick} {...navProps} onContinueConversation={handleContinueConversation} onHistoryCleared={handleHistoryClear} />;
   }
   if (currentPage === 'summary') {
     return <SessionSummaryPage onBack={handleHomeClick} {...navProps} />;
@@ -247,7 +264,14 @@ function App() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+          }}
+        >
           {messages.map((msg, index) => (
             <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line
