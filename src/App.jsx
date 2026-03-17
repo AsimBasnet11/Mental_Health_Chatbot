@@ -1,15 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import ChatInputBar from './components/ChatInputBar';
-import VoicePage from './components/VoicePage';
-import MentalStatePage from './components/MentalStatePage';
-import HistoryPage from './components/HistoryPage';
-import FAQsPage from './components/FAQsPage';
-import SessionSummaryPage from './components/SessionSummaryPage';
-import LoginPage from './components/LoginPage';
-import RegisterPage from './components/RegisterPage';
-
-const API_BASE = "http://localhost:8000";
+import { API_URL as API_BASE } from './config';
 
 function getToken() {
   return localStorage.getItem('token');

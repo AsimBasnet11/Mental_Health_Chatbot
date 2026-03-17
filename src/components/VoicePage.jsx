@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaMicrophone, FaRedo, FaBrain, FaWifi, FaPlug, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 import Sidebar from './Sidebar';
-
+import { API_URL as API_BASE } from '../config';
 const DEFAULT_WS_URL = localStorage.getItem('asr_ws_url') || "wss://vixenish-vihaan-unstrategically.ngrok-free.dev";
-const API_BASE = "http://localhost:8000";
 
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }

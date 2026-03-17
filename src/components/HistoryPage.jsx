@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaTrash, FaClock, FaComments, FaArrowRight, FaArrowLeft, FaMicrophone } from 'react-icons/fa';
 import { MessageSquare } from 'lucide-react';
 import Sidebar from './Sidebar';
-
-const API_BASE = "http://localhost:8000";
+import { API_URL as API_BASE } from '../config';
 function getToken() { return localStorage.getItem('token'); }
 function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
 

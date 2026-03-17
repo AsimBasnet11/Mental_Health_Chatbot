@@ -438,7 +438,7 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
   const [expandedPastSession, setExpandedPastSession] = useState(null);
   const [expandedPastMessages, setExpandedPastMessages] = useState(null);
 
-  const API_BASE = "http://localhost:8000";
+  const API_BASE = require('../config').API_URL;
   const getToken = () => localStorage.getItem('token');
 
   useEffect(() => {

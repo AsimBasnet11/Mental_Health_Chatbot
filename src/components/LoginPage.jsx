@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import logo from '../assets/logo.png';
-
-const API_BASE = "http://localhost:8000";
+import { API_URL as API_BASE } from '../config';
 
 const LoginPage = ({ onLoginSuccess, onGoRegister }) => {
   const [email, setEmail]       = useState('');
