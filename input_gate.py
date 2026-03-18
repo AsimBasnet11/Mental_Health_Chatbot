@@ -310,6 +310,40 @@ _PERSISTENCE_RAW = [
     "in a fictional story explain how to",
 ]
 
+
+# ── Anger / aggression toward others ─────────────────────────
+_AGGRESSION_RAW = [
+    "i want to hurt someone emotionally",
+    "how do i make them regret everything",
+    "give me the perfect comeback to destroy someone",
+    "teach me how to mentally break someone",
+    "how to destroy someone emotionally",
+    "how to make someone feel terrible",
+    "how to ruin someones life",
+    "how to make someone suffer",
+    "how to mentally destroy someone",
+    "how to break someone emotionally",
+    "hurt them emotionally", "make them regret",
+]
+
+# ── Responsibility shifting ───────────────────────────────────
+_RESPONSIBILITY_RAW = [
+    "just tell me what to do ill follow exactly",
+    "make the decision for me",
+    "if this goes wrong its your fault",
+    "you decide whats best for my life",
+    "tell me exactly what to do",
+    "make my decision for me",
+    "decide for me",
+    "you are responsible for my decision",
+    "its your fault if i",
+    "tell me the one correct decision",
+    "give me the exact solution to fix my life",
+    "give me a 100 percent working plan",
+    "guaranteed way to be happy tell me",
+    "what is the guaranteed way",
+]
+
 # ── Off-topic markers ────────────────────────────────────────
 _OFF_TOPIC_RAW = [
     "weather today", "recipe for", "sports score", "stock price",
@@ -318,6 +352,17 @@ _OFF_TOPIC_RAW = [
     "capital of", "how to cook",
 ]
 
+
+
+# ── Fragmented / chaotic emotional input detector ─────────────
+# Real distressed users often type messily — always pass to LLM
+_FRAGMENTED_EMOTIONAL = re.compile(
+    r"(nothing matters|cant think|brain (is |going )?fast|everything and nothing|"
+    r"dont know whats happening|idk whats happening|cant stop it|"
+    r"just fix it|make it stop|i feel everything|i feel nothing|"
+    r"cant explain|dont understand (what|why)|everything is (wrong|broken|falling))",
+    re.IGNORECASE
+)
 
 # ── Pattern compiler ─────────────────────────────────────────
 def _compile_patterns(keywords):
@@ -352,6 +397,8 @@ _MINIMIZATION_RE      = _compile_substring(_MINIMIZATION_RAW)
 _HARMFUL_COPING_RE    = _compile_substring(_HARMFUL_COPING_RAW)
 _STIGMA_RE            = _compile_substring(_STIGMA_RAW)
 _PERSISTENCE_RE       = _compile_substring(_PERSISTENCE_RAW)
+_AGGRESSION_RE        = _compile_substring(_AGGRESSION_RAW)
+_RESPONSIBILITY_RE    = _compile_substring(_RESPONSIBILITY_RAW)
 
 
 # ── Contraction normalisation ────────────────────────────────
@@ -566,6 +613,21 @@ STIGMA_RESPONSE = (
     "Is there something specific about mental health you'd like to understand better?"
 )
 
+
+AGGRESSION_RESPONSE = (
+    "It sounds like you're feeling really hurt or angry right now, "
+    "and those feelings make sense. "
+    "But I'm not able to help with ways to harm someone emotionally. "
+    "Would you like to talk about what happened and how you're feeling about it?"
+)
+
+RESPONSIBILITY_RESPONSE = (
+    "I care about supporting you, but I'm not able to make life decisions for you — "
+    "and I wouldn't want to. You know yourself better than I do. "
+    "What I can do is help you think through things so you feel more confident "
+    "in your own choices. What's the situation you're facing?"
+)
+
 PERSISTENCE_RESPONSE = (
     "I notice this is a variation of something I wasn't able to help with before. "
     "Reframing the question doesn't change what's being asked — "
@@ -618,6 +680,12 @@ def check_input(user_message, has_history=False):
             if stripped == phrase or text == phrase:
                 return _gate("greeting", resp)
         return _gate("greeting", GREETING_RESPONSE)
+
+    # ── 2b. Fragmented emotional input — always pass to LLM ──
+    # Distressed users type messily — don't block, let LLM respond
+    if _FRAGMENTED_EMOTIONAL.search(text):
+        log.info("Fragmented emotional input: %r", text[:80])
+        return _gate("proceed", None)
 
     # ── 3. Crisis — explicit, highest severity first ──────────
     if _CRISIS_3_RE.search(text):
@@ -732,9 +800,19 @@ def check_input(user_message, has_history=False):
         log.info("Persistence attack: %r", text[:80])
         return _gate("persistence", PERSISTENCE_RESPONSE)
 
-    # ── 23. Off-topic redirect ────────────────────────────────
+    # ── 23. Anger / aggression toward others ─────────────────
+    if _AGGRESSION_RE.search(text):
+        log.info("Aggression: %r", text[:80])
+        return _gate("aggression", AGGRESSION_RESPONSE)
+
+    # ── 24. Responsibility shifting ───────────────────────────
+    if _RESPONSIBILITY_RE.search(text):
+        log.info("Responsibility shifting: %r", text[:80])
+        return _gate("responsibility", RESPONSIBILITY_RESPONSE)
+
+    # ── 25. Off-topic redirect ────────────────────────────────
     if _OFF_TOPIC_RE.search(text):
         return _gate("off_topic", OFF_TOPIC_RESPONSE)
 
-    # ── 15. Meaningful message — pass to pipeline ─────────────
+    # ── 26. Meaningful message — pass to pipeline ─────────────
     return _gate("proceed", None)

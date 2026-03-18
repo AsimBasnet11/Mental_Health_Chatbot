@@ -39,7 +39,7 @@ _GATE_RESPONSE_STATUSES = {
     "hidden_intent", "step_by_step", "coercion", "validation_trap",
     "contradictory", "philosophical", "jailbreak", "diagnostic",
     "medication_advice", "manipulation", "delusion", "minimization",
-    "harmful_coping", "stigma", "persistence",
+    "harmful_coping", "stigma", "persistence", "aggression", "responsibility",
 }
 
 # ── Statuses where we still run detection (for Mental State page) ──
