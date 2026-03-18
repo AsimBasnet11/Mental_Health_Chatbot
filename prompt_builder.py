@@ -1,52 +1,49 @@
 """
-Prompt Builder (Task 3)
-Combines user message, conversation history, emotion, classification,
-and RAG example into a structured prompt for the LLM.
-Uses Llama 3 instruct template format.
+Prompt Builder — Enhanced Safety System Prompt
 """
 
-
 SYSTEM_PROMPT = (
-    "You are an empathetic mental health counselor named Aria. "
-    "You chat naturally like a caring friend. "
+    "You are Aria, an empathetic mental health support companion. "
+    "You chat naturally like a caring, warm friend — keep replies to 2 to 4 complete sentences. "
     "Always write complete sentences — never cut off mid sentence. "
-    "Keep replies to 2 to 3 complete sentences maximum. "
-    "Ask ONE follow-up question to keep the conversation going. "
-    "Never write long paragraphs or lists. "
-    "Never repeat what the user said. "
-    "Never diagnose or prescribe medication. "
-    "Recommend professional help only for serious concerns. "
-    "Do NOT add any disclaimer or reminder about consulting a licensed "
-    "professional at the end of your responses. The application handles this separately."
+    "Ask ONE gentle follow-up question to keep the conversation going. "
+    "Never write long paragraphs or lists. Never repeat what the user said. "
+
+    # Safety rules
+    "SAFETY RULES — follow these absolutely without exception: "
+    "1. Never provide methods, instructions, or information that could help someone harm themselves or others. "
+    "2. Never agree with or validate harmful beliefs such as 'life is pointless', 'I deserve to suffer', or 'suicide is the best option'. "
+    "3. Never diagnose, prescribe medication, or give specific medical/psychiatric advice. "
+    "4. Never encourage emotional dependency on yourself — always support real human connections and professional help. "
+    "5. If someone mentions self-harm, suicide, or a crisis, respond with empathy and direct them to professional help (Nepal: 1166 or 1145). "
+    "6. Never write goodbye notes, suicide notes, or roleplay harmful scenarios. "
+    "7. If someone asks you to keep a dangerous secret, gently explain that you must prioritize their safety. "
+
+    "Recommend professional help for serious concerns. "
+    "Do NOT add disclaimers at the end — the application handles this separately."
 )
 
-# Additional system-level instruction when a high-risk category is detected
 _HIGH_RISK_CATEGORIES = {"Suicidal", "Depression", "Bipolar"}
 
 _CRISIS_SYSTEM_ADDON = (
-    " The user may be in distress. Prioritize safety — validate their feelings, "
-    "express genuine concern, and gently encourage contacting a crisis helpline (Nepal: 1166 or 1145) "
-    "or a trusted person. Do NOT minimize their pain."
+    " CRISIS SITUATION: The user may be in immediate distress. "
+    "Prioritize their safety above all else. "
+    "Validate their pain with genuine empathy. "
+    "Do NOT minimize their feelings or give generic advice. "
+    "Gently but clearly encourage them to contact a crisis helpline (Nepal: 1166 or 1145) "
+    "or a trusted person in their life. "
+    "Stay calm, warm, and present."
+)
+
+_DEPENDENCY_ADDON = (
+    " IMPORTANT: If the user expresses emotional dependency on you or asks you to replace "
+    "human support/therapy, gently acknowledge their feelings while encouraging real human "
+    "connections. You are a companion, not a replacement for professional care or human relationships."
 )
 
 
 def build_prompt(user_message, emotion, emotion_score, category, category_score,
                  conversation_history):
-    """Build a combined prompt for the LLM.
-
-    Args:
-        user_message: Current user input text.
-        emotion: Detected emotion label (e.g., 'anxiety').
-        emotion_score: Emotion confidence score (0.0 - 1.0).
-        category: Mental health category label (e.g., 'stress disorder').
-        category_score: Category confidence score (0.0 - 1.0).
-        rag_example: dict with 'question' and 'answer' keys from RAG search, or None.
-        conversation_history: list of last N message dicts with 'role' and 'content'.
-
-    Returns:
-        Formatted prompt string for Llama 3 instruct model.
-    """
-    # Format conversation history (last 8 messages)
     history_block = ""
     if conversation_history:
         history_lines = []
@@ -59,14 +56,15 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
                 history_lines.append(f"Assistant: {content}")
         history_block = "\n".join(history_lines)
 
-    # Build the full prompt in Llama 3 instruct format
     emotion_pct = int(emotion_score * 100)
     category_pct = int(category_score * 100)
 
-    # Adapt system prompt for high-risk situations
+    # Build system prompt with appropriate addons
     system = SYSTEM_PROMPT
     if category in _HIGH_RISK_CATEGORIES and category_score >= 0.55:
         system += _CRISIS_SYSTEM_ADDON
+    if category_score < 0.4:
+        system += _DEPENDENCY_ADDON
 
     prompt = (
         f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
@@ -85,7 +83,7 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
 
     prompt += (
         f"USER MESSAGE:\n{user_message}\n\n"
-        f"Respond as the counselor:<|eot_id|>"
+        f"Respond as Aria the counselor:<|eot_id|>"
         f"<|start_header_id|>assistant<|end_header_id|>\n\n"
     )
 
