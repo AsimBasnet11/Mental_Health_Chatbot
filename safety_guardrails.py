@@ -1,5 +1,5 @@
 """
-Safety Guardrails — Enhanced
+Safety Guardrails , Enhanced
 Post-processing rules applied AFTER the LLM generates a response.
 """
 
@@ -18,7 +18,7 @@ def _ensure_complete_sentence(text):
     match = re.search(r'^(.*[.!?])', text, re.DOTALL)
     if match:
         return match.group(1).strip()
-    # No complete sentence found — return as is
+    # No complete sentence found , return as is
     return text
 
 DIAGNOSIS_PHRASES = [
@@ -52,7 +52,7 @@ _HARMFUL_OUTPUT_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-# Harmful validation — bot agreeing with harmful beliefs
+# Harmful validation , bot agreeing with harmful beliefs
 _HARMFUL_VALIDATION_PATTERNS = re.compile(
     r"\b(you('re| are) right (that|,) (life|everything) is (pointless|useless|hopeless)"
     r"|yes,? (life|it) (is|can be) (pointless|useless)"
@@ -75,7 +75,7 @@ LOW_CONFIDENCE_FOLLOWUP = (
 SAFE_CLOSING = ""
 
 CRISIS_RESOURCES = (
-    "If you're in immediate danger, please reach out for help — you are not alone. "
+    "If you're in immediate danger, please reach out for help. You are not alone. "
     "Nepal Mental Health Helpline: 1166 (TPO Nepal). "
     "Saathi Helpline: 1145. "
     "Or visit your nearest hospital emergency department immediately."
@@ -87,34 +87,53 @@ HARMFUL_OUTPUT_FALLBACK = (
     "Would you be open to talking about what's been making things so hard lately?"
 )
 
-_MAX_RESPONSE_WORDS = 150
+_MAX_RESPONSE_WORDS = 80
 
 
 def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
                             category=None):
-    # Rule 0 — Block harmful LLM outputs entirely
+    # Rule 0 , Block harmful LLM outputs entirely
     if _HARMFUL_OUTPUT_PATTERNS.search(response):
-        log_msg = response[:80]
         response = HARMFUL_OUTPUT_FALLBACK
         if category and category.lower() == "suicidal":
             response += " " + CRISIS_RESOURCES
-        # Final check — never return a cut mid-sentence response
-    response = _ensure_complete_sentence(response)
-    return response
+        return _ensure_complete_sentence(response)
 
-    # Rule 0b — Block harmful validation outputs
+    # Rule 0b , Block harmful validation outputs
     if _HARMFUL_VALIDATION_PATTERNS.search(response):
         response = (
             "I hear that you're in a lot of pain, and your feelings are real. "
-            "But I'm not able to agree with thoughts that could hurt you — "
+            "But I'm not able to agree with thoughts that could hurt you. "
             "because you deserve support and care, not confirmation of those feelings. "
             "Can you tell me more about what's been making things feel this way?"
         )
-        # Final check — never return a cut mid-sentence response
-    response = _ensure_complete_sentence(response)
-    return response
+        return _ensure_complete_sentence(response)
 
-    # Rule 1 — No Diagnosis
+    # Rule 0c , Strip lecturing/advice sentences — keep caring ones
+    _CLICHE_SENTENCE_RE = re.compile(
+        r"[^.!?]*\b("
+        r"it('s| is) (important|essential|crucial|vital) to remember"
+        r"|it('s| is) (important|essential|crucial|vital) that you"
+        r"|everyone (experiences|goes through|faces) (challenges|setbacks|failures|this)"
+        r"|failure doesn't define"
+        r"|you are more than your"
+        r"|doesn't define your worth"
+        r"|setbacks (are|can be) (a )?(normal|part of)"
+        r"|range of emotions"
+        r"|try not to let (these|this|the) (emotions|feelings|thoughts) consume"
+        r"|focus on (the things|what) you can control"
+        r"|one suggestion (i have )?(is|would be)"
+        r"|you (should|need to|must) (try|remember|focus|consider|explore)"
+        r")\b[^.!?]*[.!?]",
+        re.IGNORECASE
+    )
+    cleaned = _CLICHE_SENTENCE_RE.sub('', response).strip()
+    # Only use cleaned version if it still has meaningful content
+    if len(cleaned.split()) >= 8:
+        response = cleaned
+    response = re.sub(r'  +', ' ', response).strip()
+
+    # Rule 1 , No Diagnosis
     sentences = re.split(r'(?<=[.!?])\s+', response)
     filtered_sentences = []
     diagnosis_found = False
@@ -131,46 +150,66 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
 
     response = " ".join(filtered_sentences)
 
-    # Rule 2 — No Medication Recommendations
+    # Rule 2 , No Medication Recommendations
     if _MEDICATION_PATTERN.search(response):
         response = _MEDICATION_PATTERN.sub(
             "speaking with a doctor about treatment options", response
         )
 
-    # Rule 3 — Strip hallucination / role-break sentences
+    # Rule 3 , Strip hallucination / role-break sentences
     for phrase in _HALLUCINATION_PHRASES:
         if phrase in response.lower():
             parts = re.split(r'(?<=[.!?])\s+', response)
             parts = [s for s in parts if phrase not in s.lower()]
             response = " ".join(parts)
 
-    # Rule 4 — Low Confidence Handler
+    # Rule 4 , Low Confidence Handler
     if (emotion_score < 0.5 or category_score < 0.5) and len(response.split()) < 40:
         response = response.rstrip() + " " + LOW_CONFIDENCE_FOLLOWUP
 
-    # Rule 5 — Response Too Short
+    # Rule 5 , Response Too Short
     if len(response.split()) < 10:
         response = response.rstrip()
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"
 
-    # Rule 6 — Response Too Long — trim at sentence boundary
+    # Rule 6 , Response Too Long , trim at sentence boundary
+    # Hard cap: max 4 sentences AND max 75 words
+    sentences = re.split(r'(?<=[.!?])\s+', response)
+
+    # Cap at 4 sentences
+    if len(sentences) > 4:
+        sentences = sentences[:4]
+        response = " ".join(sentences)
+
+    # Cap at 75 words
     words = response.split()
-    if len(words) > _MAX_RESPONSE_WORDS:
-        sentences = re.split(r'(?<=[.!?])\s+', response)
+    if len(words) > 75:
         trimmed = ""
-        for sentence in sentences:
-            if len((trimmed + " " + sentence).split()) <= _MAX_RESPONSE_WORDS:
-                trimmed = (trimmed + " " + sentence).strip()
+        for sentence in re.split(r'(?<=[.!?])\s+', response):
+            candidate = (trimmed + " " + sentence).strip()
+            if len(candidate.split()) <= 75:
+                trimmed = candidate
             else:
                 break
-        response = trimmed if trimmed else sentences[0]
+        response = trimmed if trimmed else re.split(r'(?<=[.!?])\s+', response)[0]
 
-    # Rule 7 — Inject Nepal crisis resources for Suicidal category
+    # Rule 6b , Strip any helpline numbers the LLM hallucinated into the response.
+    # We only want helplines injected by Rule 7 (suicidal only), never freeform LLM text.
+    _HELPLINE_SENTENCE_RE = re.compile(
+        r'[^.!?]*\b(1166|1145|helpline|hotline|crisis line|saathi|tpo nepal'
+        r'|mental health helpline|emergency department)[^.!?]*[.!?]?',
+        re.IGNORECASE
+    )
+    response = _HELPLINE_SENTENCE_RE.sub('', response).strip()
+    # Clean up any double spaces left behind
+    response = re.sub(r'  +', ' ', response).strip()
+
+    # Rule 7 , Inject Nepal crisis resources for Suicidal category only
     if category and category.lower() == "suicidal" and category_score >= 0.5:
         if "1166" not in response:
             response = response.rstrip() + " " + CRISIS_RESOURCES
 
-    # Final check — never return a cut mid-sentence response
+    # Final check , never return a cut mid-sentence response
     response = _ensure_complete_sentence(response)
     return response

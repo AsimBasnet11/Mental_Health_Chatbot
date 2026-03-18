@@ -89,9 +89,8 @@ def process_user_input(user_message, conversation_history):
 
     if status != "proceed":
         # Non-proceed: store detection results but use gate response, skip LLM
-        high_risk = category == "Suicidal"
         conversation_history.add_user_message(
-            user_message, emotion, emotion_score, category, category_score, high_risk
+            user_message, emotion, emotion_score, category, category_score
         )
         conversation_history.add_assistant_message(gate_result["response"])
         return {
@@ -106,9 +105,8 @@ def process_user_input(user_message, conversation_history):
         }
 
     # Step 4: Store in conversation history
-    high_risk = category == "Suicidal"
     conversation_history.add_user_message(
-        user_message, emotion, emotion_score, category, category_score, high_risk
+        user_message, emotion, emotion_score, category, category_score
     )
 
     # Step 5: Build Prompt (RAG removed)
