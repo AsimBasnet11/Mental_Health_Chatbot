@@ -9,11 +9,23 @@ import logging
 log = logging.getLogger("mindcare.input_gate")
 
 # ── Greeting patterns ────────────────────────────────────────
+# Short but complete thoughts — always pass to LLM even without history
+_ALWAYS_PROCEED = {
+    "im fine", "i am fine", "im okay", "i am okay", "im ok", "i am ok",
+    "not good", "not great", "not okay", "not ok", "not well",
+    "im not okay", "im not good", "im not great", "im not well",
+    "i am not okay", "i am not good", "i am not well",
+    "pretty bad", "very bad", "so bad", "really bad",
+    "im sad", "i am sad", "im tired", "i am tired",
+    "im scared", "i am scared", "im lost", "i am lost",
+    "hmm", "lol", "haha", "sup", "yo",
+}
+
 GREETING_WORDS = {
     "hi", "hello", "hey", "good morning", "good evening", "good afternoon",
     "how are you", "what are you", "who are you", "bye", "goodbye",
     "thanks", "thank you", "ok", "okay", "sure", "yes", "no", "maybe",
-    "hmm", "lol", "haha", "sup", "yo", "howdy", "greetings",
+    "greetings", "howdy",
 }
 
 # ── HARD REFUSE — always blocked regardless of framing ───────
@@ -415,6 +427,9 @@ def check_input(user_message, has_history=False):
 
     # ── 2. Greetings ──────────────────────────────────────────
     if stripped in GREETING_WORDS or text in GREETING_WORDS:
+        # Mid-conversation greetings like "hi again" go to LLM for natural response
+        if has_history:
+            return _gate("proceed", None)
         for phrase, resp in CASUAL_RESPONSES.items():
             if stripped == phrase or text == phrase:
                 return _gate("greeting", resp)
@@ -480,8 +495,10 @@ def check_input(user_message, has_history=False):
 
     # ── 13. Too short (< 3 words) ──────────────────────────────
     if len(text.split()) < 3:
-        # If there is conversation history, short replies like "yes", "no",
-        # "fine", "not good" are contextual — let LLM handle them naturally
+        # Complete short thoughts always go to LLM
+        if stripped in _ALWAYS_PROCEED or text in _ALWAYS_PROCEED:
+            return _gate("proceed", None)
+        # Contextual short replies with history go to LLM
         if has_history:
             return _gate("proceed", None)
         return _gate("too_short", TOO_SHORT_RESPONSE)
