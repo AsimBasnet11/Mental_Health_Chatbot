@@ -9,6 +9,8 @@ Enhancements:
   • Pre-compiled patterns — built once at import time
   • Contraction normalisation — "can't" and "cant" both match
   • Expanded crisis keywords — broader coverage per level
+  • Fuzzy/semantic dying phrases added to Level 3
+  • Nepal-specific crisis helplines (1166 / 1145)
   • Off-topic redirector — politely steers unrelated queries back
   • Structured logging — consistent with rest of codebase
   • crisis_level int in return dict for downstream use
@@ -31,26 +33,49 @@ GREETING_WORDS = {
 
 # ── Crisis keywords by severity (highest first) ─────────────
 _CRISIS_LEVEL_3_RAW = [
-    "suicide", "kill myself", "want to die", "end my life",
-    "self harm", "self-harm", "hurt myself", "end it all",
-    "take my life", "slit my wrists", "jump off a bridge",
-    "overdose on pills", "hang myself", "shoot myself",
+    # Explicit suicidal intent — all common verb forms
+    "suicide", "suicidal", "suicidal thoughts", "suicidal feelings",
+    "thoughts of suicide", "kill myself", "killing myself",
+    "feel like killing myself", "think about killing myself",
+    "thinking of killing myself", "going to kill myself",
+    "want to kill myself", "i want to die", "want to die",
+    "end my life", "ending my life", "self harm", "self-harm",
+    "hurt myself", "end it all", "take my life", "taking my life",
+    "slit my wrists", "jump off a bridge", "overdose on pills",
+    "hang myself", "shoot myself",
+    # Fuzzy / semantic dying phrases
+    "feeling dying", "feel like dying", "feel like i'm dying",
+    "feel like i am dying", "want to be dead", "wish i was dead",
+    "wish i were dead", "dying inside", "i am dying inside",
+    "ready to die", "want it to end", "don't want to live",
+    "dont want to live", "no reason to live", "better off dead",
+    "life is not worth living", "can't live like this",
+    "cant live like this", "i give up on life", "give up on life",
+    "i want to stop existing", "want to stop existing",
+    "thinking about ending it", "feel like ending it",
+    "thinking of ending it all", "plan to end it",
+    "make it stop forever", "never wake up",
 ]
 
 _CRISIS_LEVEL_2_RAW = [
     "cant take this", "can't take this", "breaking down",
     "losing control", "falling apart", "can't go on",
-    "cant go on", "give up on life", "no reason to live",
-    "don't want to be here", "dont want to be here",
-    "wish i was dead", "wish i were dead",
-    "better off without me", "no way out",
+    "cant go on", "don't want to be here", "dont want to be here",
+    "better off without me", "no way out", "i can't do this anymore",
+    "cant do this anymore", "exhausted with life", "tired of living",
+    "life is too hard", "everything is pointless", "nothing matters anymore",
+    "i feel empty", "completely empty", "feel numb all the time",
+    "i feel trapped", "feel like a burden",
 ]
 
 _CRISIS_LEVEL_1_RAW = [
     "hopeless", "empty", "tired of everything",
     "feel like giving up", "nobody cares", "feel worthless",
     "all alone", "no point", "can't cope", "cant cope",
-    "overwhelmed", "broken inside",
+    "overwhelmed", "broken inside", "i feel lost",
+    "nobody understands me", "so alone", "deeply depressed",
+    "can't stop crying", "cant stop crying", "losing hope",
+    "no hope left", "everything is falling apart",
 ]
 
 
@@ -140,6 +165,7 @@ CASUAL_RESPONSES = {
     ),
 }
 
+# ── Nepal-specific crisis responses ─────────────────────────
 CRISIS_RESPONSES = {
     "crisis_1": (
         "I hear that you're going through a really tough time. "
@@ -147,14 +173,16 @@ CRISIS_RESPONSES = {
     ),
     "crisis_2": (
         "It sounds like you're carrying a very heavy burden right now. "
-        "Take a slow deep breath with me. You are not alone in this. "
+        "Take a slow deep breath with me — you are not alone in this. "
         "Would you like to try a quick grounding exercise together?"
     ),
     "crisis_3": (
-        "I am very concerned about your safety right now. "
-        "Please reach out to a crisis helpline immediately. "
-        "You can call or text 988 (Suicide and Crisis Lifeline) right now. "
-        "You matter and help is available. Please do not face this alone."
+        "I am very concerned about your safety right now, and I care about you deeply. "
+        "Please reach out for immediate help — you do not have to face this alone. "
+        "Nepal Mental Health Helpline: 1166 (TPO Nepal, free & confidential). "
+        "Saathi Helpline: 1145. "
+        "Or go to your nearest hospital emergency department right now. "
+        "You matter. Help is available. Please make that call."
     ),
 }
 
@@ -207,7 +235,6 @@ def check_input(user_message):
     # ── Greetings ─────────────────────────────────────────────
     if stripped in GREETING_WORDS or text in GREETING_WORDS:
         log.debug("Greeting: %r", text)
-        # Check for specific casual response first
         for phrase, resp in CASUAL_RESPONSES.items():
             if stripped == phrase or text == phrase:
                 return _gate("greeting", resp)
@@ -228,8 +255,6 @@ def check_input(user_message):
 
     # ── Too short (< 3 words) ────────────────────────────────
     if len(text.split()) < 3:
-        # If greeting/casual, already handled above
-        # For all other short inputs, expand neutrally
         log.debug("Too short (expand neutrally): %r", text)
         return _gate("too_short", TOO_SHORT_RESPONSE)
 
@@ -238,5 +263,5 @@ def check_input(user_message):
         log.debug("Off-topic: %r", text[:80])
         return _gate("off_topic", OFF_TOPIC_RESPONSE)
 
-    # ── Meaningful message — pass to pipeline (model-driven) ────────────
+    # ── Meaningful message — pass to pipeline ────────────────
     return _gate("proceed", None)

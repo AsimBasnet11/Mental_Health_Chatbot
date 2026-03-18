@@ -71,7 +71,7 @@ class LLMResponder:
         """Generate response using local GGUF model."""
         output = self.llm(
             prompt,
-            max_tokens=150,
+            max_tokens=300,
             temperature=0.7,
             stop=["User:", "Human:", "<|eot_id|>"],
             echo=False
@@ -83,7 +83,7 @@ class LLMResponder:
         url = f"{self.remote_url}/generate"
         payload = json.dumps({
             "prompt": prompt,
-            "max_tokens": 150,
+            "max_tokens": 300,
             "temperature": 0.7
         }).encode("utf-8")
 

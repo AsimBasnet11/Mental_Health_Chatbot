@@ -132,8 +132,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       const res = await fetch(`${API_BASE}${ENDPOINTS.TTS}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // en-US-AriaNeural — warm, natural, human-like female voice
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural" })
+        // en-US-JennyNeural — warm, natural, human-like female voice
+        body: JSON.stringify({ text, voice: "en-US-JennyNeural" })
       });
 
       // Check again after async — user may have toggled off while fetching

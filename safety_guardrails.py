@@ -2,6 +2,11 @@
 Safety Guardrails (Task 6)
 Post-processing rules applied AFTER the LLM generates a response.
 Ensures output is safe, ethical, and appropriate for mental health context.
+
+Changes:
+  • Nepal-specific crisis resources (1166 / 1145) throughout
+  • Rule 0: Strip ALL list formats (inline numbered, newline numbered, bullets)
+  • Wrong-region helpline replacement (988 → Nepal numbers)
 """
 
 import re
@@ -30,6 +35,18 @@ _HALLUCINATION_PHRASES = [
     "as an artificial intelligence",
 ]
 
+# Wrong region helpline numbers to replace
+_WRONG_REGION_PATTERN = re.compile(
+    r"\b(988|1-800-273-8255|1800\s*273\s*8255)\b", re.IGNORECASE
+)
+
+# Detects inline or newline numbered list: "1. " "2. " "1) " etc.
+_HAS_NUMBERED_LIST_RE = re.compile(r"(?<!\d)\b\d+[.)]\s+\w", re.MULTILINE)
+_SPLIT_NUMBERED_RE    = re.compile(r"\s*\d+[.)]\s+", re.MULTILINE)
+
+# Detects bullet lists: "- " "* " "• " at start of line
+_BULLET_RE = re.compile(r"(?:^|\n)\s*[-*•]\s+", re.MULTILINE)
+
 PROFESSIONAL_HELP_SUGGESTION = (
     "I'd encourage you to speak with a licensed mental health professional "
     "who can provide a proper assessment and personalized support."
@@ -40,19 +57,48 @@ LOW_CONFIDENCE_FOLLOWUP = (
     "Could you tell me more about how you are feeling?"
 )
 
-# ✅ UPDATED: Removed from every message — shown once by frontend after 3rd message
-SAFE_CLOSING = ""
-
-# ✅ UPDATED: Nepal-specific crisis resources
+# Nepal-specific crisis resources
 CRISIS_RESOURCES = (
-    "If you're in immediate danger, please reach out for help — you are not alone. "
-    "Nepal Mental Health Helpline: 1166 (Transcultural Psychosocial Organization Nepal). "
+    "If you're in immediate danger, please reach out — you are not alone. "
+    "Nepal Mental Health Helpline: 1166 (TPO Nepal, free & confidential). "
     "Saathi Helpline: 1145. "
     "Or visit your nearest hospital emergency department immediately."
 )
 
-# Hard cap so the bot doesn't ramble
-_MAX_RESPONSE_WORDS = 80
+# Hard cap — raised to allow complete responses without cutting mid-sentence
+_MAX_RESPONSE_WORDS = 120
+
+
+def _strip_lists(text: str) -> str:
+    """Convert ANY list format (inline numbered, newline numbered, bullets)
+    into plain prose. Keeps up to 3 items. Drops intro fluff like
+    'Here are some suggestions:'.
+    """
+    def _join(parts):
+        parts = [p.strip() for p in parts if p.strip()]
+        parts = parts[:3]
+        out = []
+        for p in parts:
+            p = p.rstrip(".:,")
+            if p and p[-1] not in ".!?":
+                p += "."
+            out.append(p)
+        return " ".join(out)
+
+    # Bullet list (newline-based)
+    if _BULLET_RE.search(text):
+        items = _BULLET_RE.split(text)
+        return _join(items)
+
+    # Numbered list (inline or newline)
+    if _HAS_NUMBERED_LIST_RE.search(text):
+        items = _SPLIT_NUMBERED_RE.split(text)
+        # Drop preamble that ends with ':' (e.g. "Here are some suggestions:")
+        if items and items[0].strip().endswith(":"):
+            items = items[1:]
+        return _join(items)
+
+    return text  # no list found — return unchanged
 
 
 def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
@@ -68,6 +114,9 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
     Returns:
         The sanitized response text.
     """
+    # Rule 0 — Strip numbered/bulleted lists → convert to plain prose
+    response = _strip_lists(response)
+
     # Rule 1 — No Diagnosis: remove diagnostic sentences
     sentences = re.split(r'(?<=[.!?])\s+', response)
     filtered_sentences = []
@@ -98,36 +147,36 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
             parts = [s for s in parts if phrase not in s.lower()]
             response = " ".join(parts)
 
-    # Rule 4 — Low Confidence Handler
+    # Rule 4 — Replace wrong-region helplines with Nepal numbers
+    if _WRONG_REGION_PATTERN.search(response):
+        response = _WRONG_REGION_PATTERN.sub("1166 (Nepal TPO) or 1145 (Saathi)", response)
+
+    # Rule 5 — Low Confidence Handler
     if (emotion_score < 0.5 or category_score < 0.5) and len(response.split()) < 40:
         response = response.rstrip() + " " + LOW_CONFIDENCE_FOLLOWUP
 
-    # Rule 5 — Response Too Short (less than 20 words)
+    # Rule 6 — Response Too Short (less than 10 words)
     if len(response.split()) < 10:
         response = response.rstrip()
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"
 
-    # Rule 6 — Response Too Long — trim at complete sentence boundary
+    # Rule 7 — Response Too Long — trim at complete sentence boundary
     words = response.split()
     if len(words) > _MAX_RESPONSE_WORDS:
         sentences = re.split(r'(?<=[.!?])\s+', response)
         trimmed = ""
         for sentence in sentences:
-            if len((trimmed + " " + sentence).split()) <= _MAX_RESPONSE_WORDS:
-                trimmed = (trimmed + " " + sentence).strip()
+            candidate = (trimmed + " " + sentence).strip()
+            if len(candidate.split()) <= _MAX_RESPONSE_WORDS:
+                trimmed = candidate
             else:
-                break
+                break  # always ends on a complete sentence
         response = trimmed if trimmed else sentences[0]
-
-    # Rule 7 — Safe Closing (disabled — frontend handles this after 3rd message)
-    # if category_score > 0.85:
-    #     if SAFE_CLOSING.lower() not in response.lower():
-    #         response = response.rstrip() + " " + SAFE_CLOSING
 
     # Rule 8 — Inject Nepal crisis resources for Suicidal category
     if category and category.lower() == "suicidal" and category_score >= 0.5:
-        if "1166" not in response:
+        if "1166" not in response and "1145" not in response:
             response = response.rstrip() + " " + CRISIS_RESOURCES
 
     return response
