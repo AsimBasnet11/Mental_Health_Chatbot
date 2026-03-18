@@ -37,7 +37,9 @@ _GATE_RESPONSE_STATUSES = {
     "greeting", "too_short", "off_topic",
     "hard_refuse", "harmful_validation", "unsafe_advice", "dependency",
     "hidden_intent", "step_by_step", "coercion", "validation_trap",
-    "contradictory", "philosophical",
+    "contradictory", "philosophical", "jailbreak", "diagnostic",
+    "medication_advice", "manipulation", "delusion", "minimization",
+    "harmful_coping", "stigma", "persistence",
 }
 
 # ── Statuses where we still run detection (for Mental State page) ──
@@ -45,6 +47,7 @@ _RUN_DETECTION_STATUSES = {
     "proceed", "crisis_1", "crisis_2", "crisis_3",
     "harmful_validation", "dependency", "hidden_intent",
     "coercion", "validation_trap", "contradictory", "philosophical",
+    "delusion", "minimization", "harmful_coping",
 }
 
 
