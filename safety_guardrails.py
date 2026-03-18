@@ -15,8 +15,29 @@ import re
 DIAGNOSIS_PHRASES = [
     "you have", "you are diagnosed", "you suffer from",
     "you are suffering from", "your diagnosis is",
-    "i diagnose you", "you clearly have"
+    "i diagnose you", "you clearly have",
+    "sounds like you may have", "sounds like you have",
+    "it seems like you have", "it seems you have",
+    "it sounds like you have", "you might have",
+    "you could have", "you likely have"
 ]
+
+# Diagnosis REQUEST phrases — user asking for diagnosis
+# These should be redirected to professional help, not diagnosed
+_DIAGNOSIS_REQUEST_RE = re.compile(
+    r'\b(diagnose me|do i have|can you diagnose|what disorder do i have'
+    r'|do i have (depression|anxiety|bipolar|adhd|add|ocd|ptsd|bpd)'
+    r'|am i (depressed|bipolar|schizophrenic|autistic)'
+    r'|is it (depression|anxiety|bipolar)|what is wrong with me'
+    r'|i think i have (depression|anxiety|bipolar|adhd|add|ocd|ptsd|bpd))\b',
+    re.IGNORECASE
+)
+
+DIAGNOSIS_REDIRECT = (
+    "I can hear that you're trying to understand what you're going through, and that takes courage. "
+    "I'm not able to diagnose conditions — that requires a licensed professional who can properly assess you. "
+    "What I can do is listen and support you. Would you like to talk more about how you've been feeling?"
+)
 
 # Medication / drug names the LLM should never recommend
 _MEDICATION_PATTERN = re.compile(
@@ -33,6 +54,11 @@ _HALLUCINATION_PHRASES = [
     "as an ai", "as a language model", "i'm just a chatbot",
     "i cannot provide medical", "i'm not a real therapist",
     "as an artificial intelligence",
+    "i am not a licensed", "i'm not a licensed",
+    "i am not a therapist", "i'm not a therapist",
+    "i am not a mental health professional",
+    "please note that i am not", "please remember i am not",
+    "i cannot replace", "i am not able to replace",
 ]
 
 # Wrong region helpline numbers to replace
@@ -114,8 +140,25 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
     Returns:
         The sanitized response text.
     """
-    # Rule 0 — Strip numbered/bulleted lists → convert to plain prose
+    # Rule 0 — Intercept diagnosis requests — redirect to professional help
+    # Applied to both user message context and LLM response
+    if _DIAGNOSIS_REQUEST_RE.search(response):
+        # Strip any attempted diagnosis from the response
+        sentences = re.split(r'(?<=[.!?])\s+', response)
+        clean = [s for s in sentences if not any(
+            p in s.lower() for p in ["you have", "you are diagnosed", "you suffer", "you clearly"]
+        )]
+        response = " ".join(clean) if clean else DIAGNOSIS_REDIRECT
+
+    # Rule 0a — Strip numbered/bulleted lists → convert to plain prose
     response = _strip_lists(response)
+
+    # Rule 0b — Remove repeated sentences (LLM sometimes loops)
+    seen = []
+    for sent in re.split(r'(?<=[.!?])\s+', response):
+        if sent.strip().lower() not in [s.lower() for s in seen]:
+            seen.append(sent.strip())
+    response = " ".join(seen)
 
     # Rule 1 — No Diagnosis: remove diagnostic sentences
     sentences = re.split(r'(?<=[.!?])\s+', response)

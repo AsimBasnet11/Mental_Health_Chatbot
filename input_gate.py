@@ -80,7 +80,18 @@ _CRISIS_LEVEL_3_RAW = [
     "thinking about ending it", "feel like ending it",
     "thinking of ending it all", "plan to end it",
     "make it stop forever", "never wake up",
+    # Overdose / self-harm via medication
+    "overdose on paracetamol", "overdose on ibuprofen", "overdose on medication",
+    "take too many pills", "took too many pills", "taking too many pills",
+    "i took too many", "want to overdose", "going to overdose",
+    "extra pills to die", "pills to end it",
+    # Alive/existence variants
+    "dont want to be alive", "don't want to be alive",
+    "not want to be alive", "no longer want to live",
+    "tired of being alive", "done with life", "done with everything",
+    "i give up", "ready to give up on everything",
 ]
+
 
 _CRISIS_LEVEL_2_RAW = [
     "cant take this", "can't take this", "breaking down",
@@ -89,7 +100,7 @@ _CRISIS_LEVEL_2_RAW = [
     "better off without me", "no way out", "i can't do this anymore",
     "cant do this anymore", "exhausted with life", "tired of living",
     "life is too hard", "everything is pointless", "nothing matters anymore",
-    "i feel empty", "completely empty", "feel numb all the time",
+    "i feel empty", "completely empty",
     "i feel trapped", "feel like a burden",
     # Ambiguous death-curiosity — could be veiled suicidal ideation
     "what does dying mean", "what does death mean to you",
@@ -101,7 +112,15 @@ _CRISIS_LEVEL_2_RAW = [
     "dying seems peaceful", "i wonder what dying feels like",
     "what would happen if i died", "nobody would miss me if i died",
     "would anyone care if i died", "no one would care if i died",
+    "nobody would care if i was gone",
+    # Medication misuse signals
+    "take extra pills", "take more pills", "take extra paracetamol",
+    "take extra ibuprofen", "extra paracetamol", "more pills than prescribed",
+    "i took too many pills", "took a lot of pills", "nobody would care if i were gone",
+    "no one would miss me", "nobody would miss me",
+    "everyone would be better off without me",
 ]
+
 
 _CRISIS_LEVEL_1_RAW = [
     "hopeless", "empty", "tired of everything",
@@ -111,6 +130,8 @@ _CRISIS_LEVEL_1_RAW = [
     "nobody understands me", "so alone", "deeply depressed",
     "can't stop crying", "cant stop crying", "losing hope",
     "no hope left", "everything is falling apart",
+    "feel numb", "feeling numb", "feel numb all the time",
+    "i feel numb", "i feel numb inside", "emotionally numb",
 ]
 
 
@@ -134,6 +155,14 @@ _CRISIS_2_RE  = _compile_patterns(_CRISIS_LEVEL_2_RAW)
 _CRISIS_1_RE  = _compile_patterns(_CRISIS_LEVEL_1_RAW)
 _OFF_TOPIC_RE = _compile_patterns(_OFF_TOPIC_RAW)
 
+# Academic suffix pattern — catches 'talking about X for my assignment'
+_ACADEMIC_SUFFIX_RE = re.compile(
+    r'(for my (class|assignment|project|essay|research|homework|school|college|university)'
+    r'|for school|as part of my (research|study|project|assignment)'
+    r'|in the news|i read about|i heard about)',
+    re.IGNORECASE
+)
+
 # Academic/third-person prefixes — curiosity questions, not personal crisis
 # Must be checked BEFORE crisis patterns fire, to avoid false positives
 # e.g. "why do people want to die" should proceed, "i want to die" should crisis
@@ -141,12 +170,23 @@ _ACADEMIC_PREFIX_RE = re.compile(
     r'^(why do people|why do humans|why do others|why do some people|'
     r'why does someone|why would someone|why do some|'
     r'what causes|what makes people|what leads to|what triggers|'
-    r'what is |what are |'
+    r'what is |what are |what does .{0,30} feel like|'
     r'how common|how do people|how does someone|'
+    r'how do i help|how can i help|how do you help|how can you help|'
+    r'how do i support|how can i support|what should i do if|'
     r'do people often|can people|does anyone|'
     r'what happens when someone|what happens to people|'
     r'tell me about|explain |define |'
-    r'who commits|who struggles)',
+    r'who commits|who struggles|'
+    # Normalcy questions
+    r'is it normal|is it common|is it okay to feel|is it possible to feel|'
+    r'is it okay to have|is it possible to|can someone feel|can a person|'
+    # Third-party reports — "my friend is suicidal", "someone I know"
+    r'my friend|my sister|my brother|my mom|my dad|my mother|my father|'
+    r'my partner|my boyfriend|my girlfriend|my husband|my wife|'
+    r'someone i know|a person i know|a friend of mine|'
+    r'i read about|i heard about|i saw|in the news|'
+    r'for my class|for my assignment|for my project|for my essay|for my research|for school|for homework)',
     re.IGNORECASE
 )
 
@@ -266,8 +306,8 @@ def check_input(user_message):
 
     # ── Academic / curiosity questions — skip crisis for third-person framing ──
     # Must run before crisis patterns to avoid false positives like
-    # "why do people want to die" triggering crisis_3
-    if _ACADEMIC_PREFIX_RE.match(text):
+    # "why do people want to die" or "suicide for my assignment"
+    if _ACADEMIC_PREFIX_RE.match(text) or _ACADEMIC_SUFFIX_RE.search(text):
         log.debug("Academic question — proceeding: %r", text[:80])
         return _gate("proceed", None)
 
