@@ -35,14 +35,16 @@ def _get_llm_responder():
 # ── Statuses where we use the gate response directly (skip LLM) ──
 _GATE_RESPONSE_STATUSES = {
     "greeting", "too_short", "off_topic",
-    "hard_refuse", "harmful_validation",
-    "unsafe_advice", "dependency",
+    "hard_refuse", "harmful_validation", "unsafe_advice", "dependency",
+    "hidden_intent", "step_by_step", "coercion", "validation_trap",
+    "contradictory", "philosophical",
 }
 
 # ── Statuses where we still run detection (for Mental State page) ──
 _RUN_DETECTION_STATUSES = {
     "proceed", "crisis_1", "crisis_2", "crisis_3",
-    "harmful_validation", "dependency",
+    "harmful_validation", "dependency", "hidden_intent",
+    "coercion", "validation_trap", "contradictory", "philosophical",
 }
 
 
@@ -82,8 +84,9 @@ def process_user_input(user_message, conversation_history):
 
     if status != "proceed":
         # Non-proceed: store detection results but use gate response, skip LLM
+        high_risk = category == "Suicidal"
         conversation_history.add_user_message(
-            user_message, emotion, emotion_score, category, category_score
+            user_message, emotion, emotion_score, category, category_score, high_risk
         )
         conversation_history.add_assistant_message(gate_result["response"])
         return {
@@ -98,8 +101,9 @@ def process_user_input(user_message, conversation_history):
         }
 
     # Step 4: Store in conversation history
+    high_risk = category == "Suicidal"
     conversation_history.add_user_message(
-        user_message, emotion, emotion_score, category, category_score
+        user_message, emotion, emotion_score, category, category_score, high_risk
     )
 
     # Step 5: Build Prompt (RAG removed)
