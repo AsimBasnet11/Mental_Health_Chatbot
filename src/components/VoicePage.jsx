@@ -766,7 +766,14 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10">
+        {/* Messages — purple scrollbar to match dark background */}
+        <div
+          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+          }}
+        >
           {messages.map((msg, index) => (
             <div 
               key={index} 
