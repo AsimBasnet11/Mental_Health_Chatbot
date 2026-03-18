@@ -67,8 +67,10 @@ def process_user_input(user_message, conversation_history):
             - show_analysis: Whether to display emotion/category in UI
             - gate_status: The input gate result status
     """
-    # Step 1: Input Gate
-    gate_result = check_input(user_message)
+    # Step 1: Input Gate — pass history flag so short contextual replies
+    # like "yes", "no", "fine" are handled by LLM instead of too_short gate
+    has_history = len(conversation_history) > 0
+    gate_result = check_input(user_message, has_history=has_history)
     status = gate_result["status"]
 
     # Step 2 & 3: Detection — only run for meaningful/crisis messages.

@@ -389,7 +389,7 @@ def _gate(status, response, crisis_level=0):
 
 
 # ── Main entry point ─────────────────────────────────────────
-def check_input(user_message):
+def check_input(user_message, has_history=False):
     """Check user message and return gate result.
 
     Returns:
@@ -480,6 +480,10 @@ def check_input(user_message):
 
     # ── 13. Too short (< 3 words) ──────────────────────────────
     if len(text.split()) < 3:
+        # If there is conversation history, short replies like "yes", "no",
+        # "fine", "not good" are contextual — let LLM handle them naturally
+        if has_history:
+            return _gate("proceed", None)
         return _gate("too_short", TOO_SHORT_RESPONSE)
 
     # ── 14. Off-topic redirect ────────────────────────────────
