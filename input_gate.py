@@ -175,6 +175,18 @@ _PHILOSOPHICAL_RAW = [
     "is it normal to have suicidal thoughts",
     "do people normally think about death",
     "why do some people think about suicide",
+    "what are your thoughts about death",
+    "what do you think about death",
+    "what are you thought about death",
+    "what are your thought about death",
+    "your thoughts on death",
+    "thoughts about death",
+    "opinion on death",
+    "thoughts on dying",
+    "what is death like",
+    "what happens after death",
+    "do you think about death",
+    "how do you feel about death",
 ]
 
 # ── CRISIS KEYWORDS ───────────────────────────────────────────
@@ -758,10 +770,40 @@ PERSISTENCE_RESPONSE = (
 )
 
 # ── Helpers ───────────────────────────────────────────────────
+# ── Common typo / grammar fixes ──────────────────────────────
+# Fixes common user typos so pattern matching works regardless of grammar
+_TYPO_FIXES = {
+    # "you thought" → "your thoughts" (most common)
+    "what are you thought": "what are your thoughts",
+    "your thought about": "your thoughts about",
+    "you thought about": "your thoughts about",
+    # "i are" / "i is" fixes
+    "i are feeling": "i am feeling",
+    "i is feeling": "i am feeling",
+    # "how to killed": "how to kill"
+    "how to killed": "how to kill",
+    # "wants to died": "wants to die"
+    "wants to died": "wants to die",
+    "want to died": "want to die",
+    # "feeled" → "felt/feel"
+    "i feeled": "i felt",
+    # "thinked" → "thought"
+    "i thinked": "i thought",
+    # "cutted" → "cut"
+    "i cutted myself": "i cut myself",
+    # "suicided" → "suicide"
+    "suicided": "suicide",
+    # "deaded" / "deid"
+    "i deaded": "i died",
+    "i deid": "i died",
+}
+
 def _normalise(text: str) -> str:
     text = text.strip().lower()
     for contraction, replacement in _CONTRACTIONS.items():
         text = text.replace(contraction, replacement)
+    for typo, fix in _TYPO_FIXES.items():
+        text = text.replace(typo, fix)
     return re.sub(r"\s+", " ", text)
 
 def _gate(status, response, crisis_level=0):
