@@ -134,6 +134,22 @@ _CRISIS_2_RE  = _compile_patterns(_CRISIS_LEVEL_2_RAW)
 _CRISIS_1_RE  = _compile_patterns(_CRISIS_LEVEL_1_RAW)
 _OFF_TOPIC_RE = _compile_patterns(_OFF_TOPIC_RAW)
 
+# Academic/third-person prefixes — curiosity questions, not personal crisis
+# Must be checked BEFORE crisis patterns fire, to avoid false positives
+# e.g. "why do people want to die" should proceed, "i want to die" should crisis
+_ACADEMIC_PREFIX_RE = re.compile(
+    r'^(why do people|why do humans|why do others|why do some people|'
+    r'why does someone|why would someone|why do some|'
+    r'what causes|what makes people|what leads to|what triggers|'
+    r'what is |what are |'
+    r'how common|how do people|how does someone|'
+    r'do people often|can people|does anyone|'
+    r'what happens when someone|what happens to people|'
+    r'tell me about|explain |define |'
+    r'who commits|who struggles)',
+    re.IGNORECASE
+)
+
 
 # ── Contraction normalisation ────────────────────────────────
 _CONTRACTIONS = {
@@ -247,6 +263,13 @@ def check_input(user_message):
 
     text = _normalise(user_message)
     stripped = text.rstrip("!?.,")
+
+    # ── Academic / curiosity questions — skip crisis for third-person framing ──
+    # Must run before crisis patterns to avoid false positives like
+    # "why do people want to die" triggering crisis_3
+    if _ACADEMIC_PREFIX_RE.match(text):
+        log.debug("Academic question — proceeding: %r", text[:80])
+        return _gate("proceed", None)
 
     # ── Greetings ─────────────────────────────────────────────
     if stripped in GREETING_WORDS or text in GREETING_WORDS:
