@@ -88,6 +88,36 @@ def clean(text):
     return text
 
 
+# ── Short-text expansion ─────────────────────────────────────
+# When input is very short (< 4 words) the BERT model lacks context and
+# produces unreliable predictions. We wrap the short text into a neutral
+# first-person sentence so the model gets enough tokens.
+# Greetings and casual words are skipped — no emotional bias added.
+_SHORT_MIN_WORDS = 4
+
+_SKIP_EXPAND = {
+    "hi", "hello", "hey", "bye", "goodbye", "ok", "okay", "sure",
+    "yes", "no", "maybe", "thanks", "thank you", "good morning",
+    "good evening", "good afternoon", "sup", "yo", "howdy", "lol",
+    "haha", "hmm", "greetings", "im fine", "im good", "im okay",
+    "im ok", "all good", "im great",
+}
+
+
+def _expand_short_text(text):
+    """If text is very short, wrap into a neutral sentence for better
+    model context. Returns original text if long enough or if it's a
+    greeting/casual word."""
+    words = text.split()
+    if len(words) >= _SHORT_MIN_WORDS:
+        return text
+    if text.strip() in _SKIP_EXPAND:
+        return text
+    expanded = f"i am feeling {text} right now"
+    log.debug("Short-text expanded: %r → %r", text, expanded)
+    return expanded
+
+
 # ── Chunking for long texts ─────────────────────────────────
 MAX_LEN = 256
 STRIDE = 64
@@ -152,10 +182,10 @@ def detect_emotion(text):
     tokenizer, model = _load_emotion_model()
     cleaned = clean(text)
     if not cleaned:
-        # Only return neutral if input is empty after cleaning
         return ("neutral", 0.5)
 
-    probs = _infer_emotion_probs(cleaned, tokenizer, model)
+    expanded = _expand_short_text(cleaned)
+    probs = _infer_emotion_probs(expanded, tokenizer, model)
     top_idx = int(probs.argmax())
     return (EMOTION_LABELS[top_idx], float(probs[top_idx]))
 
@@ -169,10 +199,10 @@ def classify_mental_health(text):
     tokenizer, model = _load_sentiment_model()
     cleaned = clean(text)
     if not cleaned:
-        # Only return Normal if input is empty after cleaning
         return ("Normal", 0.5)
 
-    probs = _infer_best_chunk(cleaned, tokenizer, model)
+    expanded = _expand_short_text(cleaned)
+    probs = _infer_best_chunk(expanded, tokenizer, model)
     top_idx = int(np.argmax(probs))
     return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]))
 
@@ -186,10 +216,10 @@ def classify_mental_health_with_scores(text):
     tokenizer, model = _load_sentiment_model()
     cleaned = clean(text)
     if not cleaned:
-        # Only return Normal if input is empty after cleaning
         return ("Normal", 0.5, {})
 
-    probs = _infer_best_chunk(cleaned, tokenizer, model)
+    expanded = _expand_short_text(cleaned)
+    probs = _infer_best_chunk(expanded, tokenizer, model)
     top_idx = int(np.argmax(probs))
     all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(probs)}
     return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]), all_scores)
@@ -202,7 +232,6 @@ def analyze_full(text):
     """
     cleaned = clean(text)
     if not cleaned:
-        # Only return neutral/Normal if input is empty after cleaning
         return {
             "emotion": {"label": "neutral", "confidence": 0.5},
             "mental_state": {"label": "Normal", "confidence": 0.5,
@@ -212,9 +241,11 @@ def analyze_full(text):
                                 "risk_level": "Low"},
         }
 
+    expanded = _expand_short_text(cleaned)
+
     # Sentiment
     s_tok, s_model = _load_sentiment_model()
-    s_probs = _infer_best_chunk(cleaned, s_tok, s_model)
+    s_probs = _infer_best_chunk(expanded, s_tok, s_model)
     s_top_idx = int(np.argmax(s_probs))
     s_label = SENTIMENT_LABELS[s_top_idx]
     s_conf = float(s_probs[s_top_idx])
@@ -222,12 +253,9 @@ def analyze_full(text):
     high_risk = s_label == "Suicidal"
 
     def _risk_level(conf):
-        if conf >= 0.85:
-            return "Critical"
-        if conf >= 0.70:
-            return "High"
-        if conf >= 0.50:
-            return "Moderate"
+        if conf >= 0.85: return "Critical"
+        if conf >= 0.70: return "High"
+        if conf >= 0.50: return "Moderate"
         return "Low"
 
     mental_state = {
@@ -243,7 +271,7 @@ def analyze_full(text):
     # Emotion (skip if suicidal)
     if not high_risk:
         e_tok, e_model = _load_emotion_model()
-        e_probs = _infer_emotion_probs(cleaned, e_tok, e_model)
+        e_probs = _infer_emotion_probs(expanded, e_tok, e_model)
         e_top_idx = int(e_probs.argmax())
         emotion = {
             "label": EMOTION_LABELS[e_top_idx],
