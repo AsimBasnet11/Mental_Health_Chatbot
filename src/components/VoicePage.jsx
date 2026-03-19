@@ -132,8 +132,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       const res = await fetch(`${API_BASE}${ENDPOINTS.TTS}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // en-US-JennyNeural — warm, natural, human-like female voice
-        body: JSON.stringify({ text, voice: "en-US-JennyNeural" })
+        // en-US-AriaNeural — warm, natural, human-like female voice
+        body: JSON.stringify({ text, voice: "en-US-AriaNeural" })
       });
 
       // Check again after async — user may have toggled off while fetching
@@ -766,7 +766,14 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10">
+        {/* Messages — purple scrollbar to match dark background */}
+        <div
+          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+          }}
+        >
           {messages.map((msg, index) => (
             <div 
               key={index} 
