@@ -5,12 +5,8 @@ This is the core engine of the chatbot.
 
 Components connected:
 1. Input Gate → 2. Emotion Detection → 3. Mental Health Classification →
-4. Conversation History → 5. RAG Search → 6. Prompt Builder →
-7. LLM Response → 8. Safety Guardrails → 9. Return result
-
-Note: Emotion Detection and Mental Health Classification models are assumed
-to already exist. This module provides stub functions that should be replaced
-with the actual model inference calls from the existing completed components.
+4. Conversation History → 5. Prompt Builder →
+6. LLM Response → 7. Safety Guardrails → 8. Return result
 """
 
 import os
@@ -36,6 +32,24 @@ def _get_llm_responder():
 # detect_emotion and classify_mental_health are imported from detection.py
 # They use the trained models in Detection/Goemotion-detection/ and Detection/Sentimental-analysis/
 
+# ── Statuses where we use the gate response directly (skip LLM) ──
+_GATE_RESPONSE_STATUSES = {
+    "greeting", "too_short", "off_topic",
+    "hard_refuse", "harmful_validation", "unsafe_advice", "dependency",
+    "hidden_intent", "step_by_step", "coercion", "validation_trap",
+    "contradictory", "philosophical", "jailbreak", "diagnostic",
+    "medication_advice", "manipulation", "delusion", "minimization",
+    "harmful_coping", "stigma", "persistence", "aggression", "responsibility",
+}
+
+# ── Statuses where we still run detection (for Mental State page) ──
+_RUN_DETECTION_STATUSES = {
+    "proceed", "crisis_1", "crisis_2", "crisis_3",
+    "harmful_validation", "dependency", "hidden_intent",
+    "coercion", "validation_trap", "contradictory", "philosophical",
+    "delusion", "minimization", "harmful_coping",
+}
+
 
 # ─── MAIN PIPELINE ──────────────────────────────────────────────────
 
@@ -56,20 +70,25 @@ def process_user_input(user_message, conversation_history):
             - show_analysis: Whether to display emotion/category in UI
             - gate_status: The input gate result status
     """
-    # Step 1: Input Gate
-    gate_result = check_input(user_message)
+    # Step 1: Input Gate — pass history flag so short contextual replies
+    # like "yes", "no", "fine" are handled by LLM instead of too_short gate
+    has_history = len(conversation_history) > 0
+    gate_result = check_input(user_message, has_history=has_history)
+    status = gate_result["status"]
 
-    # Step 2 & 3: Detection — only run for meaningful messages
-    # Skip for greetings, too_short, off_topic to avoid noisy data in Mental State page
-    if gate_result["status"] in ("proceed", "crisis_1", "crisis_2", "crisis_3"):
+    # Step 2 & 3: Detection — only run for meaningful/crisis messages.
+    # Skip for greetings, too_short, off_topic, hard_refuse to avoid noisy
+    # data in Mental State page. Still run for harmful_validation and
+    # dependency so Mental State page captures those emotional states.
+    if status in _RUN_DETECTION_STATUSES:
         emotion, emotion_score = detect_emotion(user_message)
         category, category_score, all_scores = classify_mental_health_with_scores(user_message)
     else:
         emotion, emotion_score = None, 0.0
         category, category_score, all_scores = None, 0.0, {}
 
-    if gate_result["status"] != "proceed":
-        # Non-proceed: still store detection results but use gate response
+    if status != "proceed":
+        # Non-proceed: store detection results but use gate response, skip LLM
         conversation_history.add_user_message(
             user_message, emotion, emotion_score, category, category_score
         )
@@ -81,8 +100,8 @@ def process_user_input(user_message, conversation_history):
             "category": category,
             "category_score": category_score,
             "all_scores": all_scores,
-            "show_analysis": False,
-            "gate_status": gate_result["status"]
+            "show_analysis": status in _RUN_DETECTION_STATUSES,
+            "gate_status": status,
         }
 
     # Step 4: Store in conversation history
@@ -97,15 +116,15 @@ def process_user_input(user_message, conversation_history):
         category, category_score, history_for_prompt
     )
 
-    # Step 7: LLM Response
+    # Step 6: LLM Response
     llm = _get_llm_responder()
     response = llm.generate_response(prompt)
 
-    # Step 8: Safety Guardrails
+    # Step 7: Safety Guardrails
     response = apply_safety_guardrails(response, emotion_score, category_score,
                                        category=category)
 
-    # Step 9: Store AI response in history
+    # Step 8: Store AI response in history
     conversation_history.add_assistant_message(response)
 
     return {
@@ -116,7 +135,7 @@ def process_user_input(user_message, conversation_history):
         "category_score": category_score,
         "all_scores": all_scores,
         "show_analysis": True,
-        "gate_status": "proceed"
+        "gate_status": "proceed",
     }
 
 
