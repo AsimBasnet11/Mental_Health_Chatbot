@@ -15,7 +15,7 @@ def generate_session_summary(conversation_history):
             role, content, emotion, emotion_score, category, category_score.
 
     Returns:
-        dict with summary fields:n
+        dict with summary fields:
             primary_emotion, primary_category, trend, start_score,
             end_score, recommendation, message_count, summary_text,
             top_emotions, avg_distress, risk_flags
@@ -74,13 +74,17 @@ def generate_session_summary(conversation_history):
     avg_distress = round(sum(cat_scores) / len(cat_scores), 3) if cat_scores else 0.0
 
     # 5. Risk flags — messages where Suicidal was detected
+    _RISK_CATEGORIES = {"Suicidal", "Depression", "Bipolar"}
     risk_flags = []
     for idx, m in enumerate(user_messages, 1):
-        if m.get("category") == "Suicidal":
+        cat = m.get("category", "")
+        score = m.get("category_score", 0)
+        if cat == "Suicidal" or (cat in _RISK_CATEGORIES and score >= 0.75):
             risk_flags.append({
                 "message_number": idx,
+                "category": cat,
                 "text_preview": (m.get("content", "")[:60] + "...") if len(m.get("content", "")) > 60 else m.get("content", ""),
-                "confidence": round(m.get("category_score", 0), 3),
+                "confidence": round(score, 3),
             })
 
     # 6. Recommendation based on final category_score
@@ -91,7 +95,7 @@ def generate_session_summary(conversation_history):
             "We strongly recommend reaching out to a crisis helpline (1166 or 1145) "
             "or a trusted mental health professional immediately."
         )
-    elif final_cat_score > 0.9:
+    elif final_cat_score > 0.7:
         recommendation = "We strongly recommend speaking with a licensed mental health professional or medical doctor."
     elif final_cat_score > 0.5:
         recommendation = "Consider speaking with a counselor for additional support."
@@ -134,3 +138,15 @@ def generate_session_summary(conversation_history):
         "top_emotions": top_emotions,
         "risk_flags": risk_flags,
     }
+
+
+def end_session(conversation_history):
+    """Wrapper called by pipeline.py — delegates to generate_session_summary."""
+    if hasattr(conversation_history, 'get_history'):
+        # ConversationHistory object — extract list
+        history_list = conversation_history.get_history()
+    elif isinstance(conversation_history, list):
+        history_list = conversation_history
+    else:
+        history_list = []
+    return generate_session_summary(history_list)
