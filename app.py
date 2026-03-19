@@ -2,7 +2,7 @@
 Mental Health AI Chatbot — Unified Backend
 FastAPI server combining:
   - Auth (JWT + bcrypt + SQLite)
-  - Full pipeline (input_gate -> detection -> RAG -> prompt -> LLM -> safety)
+  - Full pipeline (input_gate -> detection -> prompt -> LLM -> safety)
   - Conversation storage (messages saved without confidence scores)
   - Analysis history (for Mental State page with detection scores)
 """
@@ -437,9 +437,57 @@ def sentiment(session_id: str = "default"):
     return {"scores": h.get_score_history() if h else []}
 
 @app.post("/api/summary")
-def summary(body: SummaryIn):
-    h = sessions.get(body.session_id)
-    if not h: return {"message_count": 0, "summary_text": "No messages."}
+def summary(body: SummaryIn, current_user=Depends(get_current_user)):
+    # Step 1: Try in-memory session first (fast path)
+    # Use get_session() so it properly loads/creates the session object
+    h = get_session(body.session_id, user_id=current_user["user_id"])
+
+    # Step 2: Check if in-memory session has scored user messages
+    # (messages loaded from messages table via get_session lack emotion/category scores,
+    #  so we check analysis_history which always has the full scores)
+    has_scores = any(
+        m.get("category_score") is not None
+        for m in (h.get_history() if hasattr(h, "get_history") else [])
+        if m.get("role") == "user"
+    )
+
+    if not has_scores:
+        # Rebuild from analysis_history (has emotion + category scores)
+        try:
+            with get_db() as conn:
+                conv = conn.execute(
+                    "SELECT id FROM conversations WHERE session_id=? AND user_id=?",
+                    (body.session_id, current_user["user_id"])
+                ).fetchone()
+                if conv:
+                    rows = conn.execute(
+                        """SELECT user_text, mental_label, mental_conf,
+                           emotion_label, emotion_conf, timestamp
+                           FROM analysis_history
+                           WHERE session_id=? AND user_id=?
+                           ORDER BY timestamp ASC""",
+                        (body.session_id, current_user["user_id"])
+                    ).fetchall()
+                    if rows:
+                        from conversation_history import ConversationHistory
+                        rebuilt = ConversationHistory()
+                        for row in rows:
+                            rebuilt.add_user_message(
+                                content=row["user_text"],
+                                emotion=row["emotion_label"],
+                                emotion_score=row["emotion_conf"] or 0.0,
+                                category=row["mental_label"],
+                                category_score=row["mental_conf"] or 0.0,
+                            )
+                        log.info("Summary rebuilt from DB for session %s", body.session_id)
+                        return end_session(rebuilt)
+        except Exception as e:
+            log.error("Failed to rebuild summary from DB: %s", e)
+            raise HTTPException(status_code=500, detail="Failed to generate summary.")
+        # Conv exists but analysis_history is empty (no /chat calls made, only /analyze)
+        return {"message_count": 0, "summary_text": "No messages."}
+
+    # Step 3: In-memory session has scored data — generate summary directly
     r = end_session(h)
     # Do NOT pop the session — keep it alive so the user can continue chatting
     return r
@@ -462,7 +510,6 @@ def health():
         "models": {
             "sentiment": _sentiment_model is not None,
             "emotion":   _emotion_model is not None,
-            "rag":       False,
             "llm":       _llm_responder is not None,
         },
         "database": db_ok,
@@ -482,7 +529,6 @@ async def warmup_models():
         log.info("Detection models loaded")
     except Exception as e:
         log.error("Detection model warmup failed: %s", e)
-    # RAG removed — no warmup required
     log.info("Warmup complete")
 
 
