@@ -27,7 +27,7 @@ class LLMResponder:
         file exists locally.
         """
         self.remote_url = os.environ.get(
-            "LLM_API_URL", "https://spongy-kynlee-unflat.ngrok-free.dev"
+            "LLM_API_URL", "https://isotimic-jeni-unforgetting.ngrok-free.dev"
         ).strip()
         self.llm = None
 

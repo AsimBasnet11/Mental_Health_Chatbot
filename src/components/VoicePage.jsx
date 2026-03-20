@@ -484,11 +484,48 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
     }
   };
 
+  // Ensure WebSocket is connected before starting mic capture.
+  // This avoids forcing users to click connect manually while auto-connect
+  // is already in progress on initial page load.
+  const ensureServerConnected = async (timeoutMs = 7000) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      setConnectionStatus('connected');
+      setIsConnected(true);
+      return true;
+    }
+
+    if (!wsUrl.trim()) {
+      alert('Please enter the ASR WebSocket URL first!');
+      return false;
+    }
+
+    if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+      connectToServer();
+    }
+
+    const start = Date.now();
+    return new Promise((resolve) => {
+      const poll = () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start >= timeoutMs) {
+          resolve(false);
+          return;
+        }
+        setTimeout(poll, 150);
+      };
+      poll();
+    });
+  };
+
   // Start Recording
   const startRecording = async () => {
-    if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      alert('Please connect to server first (click green connect button)!');
-      console.log('[Voice] Cannot record: not connected');
+    const connected = await ensureServerConnected();
+    if (!connected) {
+      alert('Still connecting to ASR server. Please wait a moment and try again.');
+      console.log('[Voice] Cannot record: server is not connected yet');
       return;
     }
 
