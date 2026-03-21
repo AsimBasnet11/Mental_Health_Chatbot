@@ -268,7 +268,7 @@ const HistoryPage = ({
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+              <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(109,40,217,0.4) transparent' }}>
                 {loadingMessages ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-purple-300/60 animate-pulse">Loading messages...</div>

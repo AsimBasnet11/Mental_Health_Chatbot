@@ -624,7 +624,7 @@ const MentalStatePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryCli
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-6 relative z-10">
+        <div className="flex-1 overflow-y-auto p-6 relative z-10 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(109,40,217,0.4) transparent' }}>
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-purple-300/60 animate-pulse">Loading analysis...</div>
