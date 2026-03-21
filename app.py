@@ -2,7 +2,7 @@
 Mental Health AI Chatbot — Unified Backend
 FastAPI server combining:
   - Auth (JWT + bcrypt + SQLite)
-  - Full pipeline (input_gate -> detection -> prompt -> LLM -> safety)
+  - Full pipeline (input_gate -> detection -> RAG -> prompt -> LLM -> safety)
   - Conversation storage (messages saved without confidence scores)
   - Analysis history (for Mental State page with detection scores)
 """
@@ -438,10 +438,10 @@ def sentiment(session_id: str = "default"):
 
 @app.post("/api/summary")
 def summary(body: SummaryIn, current_user=Depends(get_optional_user)):
-    # Step 1: Try in-memory session first (fast path)
+    # Step 1: Try in-memory session first
     h = sessions.get(body.session_id)
 
-    # Step 2: If not in memory (server restart / session expired), rebuild from DB
+    # Step 2: If not in memory, rebuild from DB
     if not h or len(h) == 0:
         if current_user:
             try:
@@ -451,7 +451,6 @@ def summary(body: SummaryIn, current_user=Depends(get_optional_user)):
                         (body.session_id, current_user["user_id"])
                     ).fetchone()
                     if conv:
-                        # Load analysis history for this session (has emotion/category scores)
                         rows = conn.execute(
                             """SELECT user_text, mental_label, mental_conf,
                                emotion_label, emotion_conf, timestamp
@@ -461,9 +460,7 @@ def summary(body: SummaryIn, current_user=Depends(get_optional_user)):
                             (body.session_id, current_user["user_id"])
                         ).fetchall()
                         if rows:
-                            # Rebuild a ConversationHistory-compatible list for summary
                             from conversation_history import ConversationHistory
-                            from pipeline import end_session
                             rebuilt = ConversationHistory()
                             for row in rows:
                                 rebuilt.add_user_message(
@@ -479,9 +476,8 @@ def summary(body: SummaryIn, current_user=Depends(get_optional_user)):
                 log.error("Failed to rebuild summary from DB: %s", e)
         return {"message_count": 0, "summary_text": "No messages."}
 
-    # Step 3: In-memory session found — generate summary directly
+    # Step 3: In-memory session found
     r = end_session(h)
-    # Do NOT pop the session — keep it alive so the user can continue chatting
     return r
 
 @app.get("/health")
@@ -502,6 +498,7 @@ def health():
         "models": {
             "sentiment": _sentiment_model is not None,
             "emotion":   _emotion_model is not None,
+            "rag":       False,
             "llm":       _llm_responder is not None,
         },
         "database": db_ok,
@@ -521,6 +518,7 @@ async def warmup_models():
         log.info("Detection models loaded")
     except Exception as e:
         log.error("Detection model warmup failed: %s", e)
+    # RAG removed — no warmup required
     log.info("Warmup complete")
 
 

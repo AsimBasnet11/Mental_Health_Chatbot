@@ -18,6 +18,11 @@ _ALWAYS_PROCEED = {
     "im sad", "i am sad", "im tired", "i am tired",
     "im scared", "i am scared", "im lost", "i am lost",
     "hmm", "lol", "haha", "sup", "yo",
+    "in lists", "as a list", "in a list", "as lists",
+    "in bullet points", "numbered list", "give list",
+    "more details", "tell me more", "explain more",
+    "yes please", "go on", "continue", "okay go",
+    "in points", "as points", "point form",
 }
 
 GREETING_WORDS = {

@@ -54,36 +54,36 @@ class LLMResponder:
             log.info("Local mode — loading %s...", model_path)
             self.llm = Llama(
                 model_path=model_path,
-                n_ctx=2048,
+                n_ctx=4096,
                 n_gpu_layers=-1,
                 verbose=False
             )
             log.info("Model loaded locally.")
 
-    def generate_response(self, prompt):
+    def generate_response(self, prompt, max_tokens=300):
         """Generate a therapist-like response from the prompt."""
         if self.remote_url:
-            return self._generate_remote(prompt)
+            return self._generate_remote(prompt, max_tokens=max_tokens)
         else:
-            return self._generate_local(prompt)
+            return self._generate_local(prompt, max_tokens=max_tokens)
 
-    def _generate_local(self, prompt):
+    def _generate_local(self, prompt, max_tokens=300):
         """Generate response using local GGUF model."""
         output = self.llm(
             prompt,
-            max_tokens=300,
+            max_tokens=max_tokens,
             temperature=0.7,
             stop=["User:", "Human:", "<|eot_id|>"],
             echo=False
         )
         return output["choices"][0]["text"].strip()
 
-    def _generate_remote(self, prompt):
+    def _generate_remote(self, prompt, max_tokens=300):
         """Generate response by calling Colab LLM API."""
         url = f"{self.remote_url}/generate"
         payload = json.dumps({
             "prompt": prompt,
-            "max_tokens": 300,
+            "max_tokens": max_tokens,
             "temperature": 0.7
         }).encode("utf-8")
 

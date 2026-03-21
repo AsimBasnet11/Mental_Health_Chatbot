@@ -142,9 +142,12 @@ def generate_session_summary(conversation_history):
 
 def end_session(conversation_history):
     """Wrapper called by pipeline.py — delegates to generate_session_summary."""
-    if hasattr(conversation_history, 'get_history'):
-        # ConversationHistory object — extract list
-        history_list = conversation_history.get_history()
+    if hasattr(conversation_history, 'get_all'):
+        # ConversationHistory object — extract full list
+        history_list = conversation_history.get_all()
+    elif hasattr(conversation_history, 'messages'):
+        # Direct access to messages attribute
+        history_list = conversation_history.messages
     elif isinstance(conversation_history, list):
         history_list = conversation_history
     else:

@@ -91,7 +91,7 @@ _MAX_RESPONSE_WORDS = 80
 
 
 def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
-                            category=None):
+                            category=None, requested_list_count=None):
     # Rule 0 , Block harmful LLM outputs entirely
     if _HARMFUL_OUTPUT_PATTERNS.search(response):
         response = HARMFUL_OUTPUT_FALLBACK
@@ -173,26 +173,37 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"
 
-    # Rule 6 , Response Too Long , trim at sentence boundary
-    # Hard cap: max 4 sentences AND max 75 words
-    sentences = re.split(r'(?<=[.!?])\s+', response)
+    # Rule 6 — Dynamic: lists respect requested count, paragraphs get hard cap
+    is_list = bool(re.search(r'(^|\n|\s)\s*\d+[.)]\s+\w', response))
 
-    # Cap at 4 sentences
-    if len(sentences) > 4:
-        sentences = sentences[:4]
-        response = " ".join(sentences)
-
-    # Cap at 75 words
-    words = response.split()
-    if len(words) > 75:
-        trimmed = ""
-        for sentence in re.split(r'(?<=[.!?])\s+', response):
-            candidate = (trimmed + " " + sentence).strip()
-            if len(candidate.split()) <= 75:
-                trimmed = candidate
-            else:
-                break
-        response = trimmed if trimmed else re.split(r'(?<=[.!?])\s+', response)[0]
+    if is_list:
+        # Split on numbered items
+        parts = re.split(r'(?=\n?\s*\d+[.)])', response)
+        complete = [p.strip() for p in parts if p.strip()]
+        # Remove last item if cut off (no sentence-ending punctuation)
+        if complete and not re.search(r'[.!?]\s*$', complete[-1]):
+            if len(complete) > 1:
+                complete = complete[:-1]
+        # If user requested a specific count, honour it
+        if requested_list_count and len(complete) > requested_list_count:
+            complete = complete[:requested_list_count]
+        response = "\n".join(complete) if complete else response
+    else:
+        # Paragraph — hard cap: 4 sentences AND 75 words (unchanged)
+        sentences = re.split(r'(?<=[.!?])\s+', response)
+        if len(sentences) > 4:
+            sentences = sentences[:4]
+            response = " ".join(sentences)
+        words = response.split()
+        if len(words) > 75:
+            trimmed = ""
+            for sentence in re.split(r'(?<=[.!?])\s+', response):
+                candidate = (trimmed + " " + sentence).strip()
+                if len(candidate.split()) <= 75:
+                    trimmed = candidate
+                else:
+                    break
+            response = trimmed if trimmed else re.split(r'(?<=[.!?])\s+', response)[0]
 
     # Rule 6b , Strip any helpline numbers the LLM hallucinated into the response.
     # We only want helplines injected by Rule 7 (suicidal only), never freeform LLM text.
@@ -206,7 +217,7 @@ def apply_safety_guardrails(response, emotion_score=1.0, category_score=1.0,
     response = re.sub(r'  +', ' ', response).strip()
 
     # Rule 7 , Inject Nepal crisis resources for Suicidal category only
-    if category and category.lower() == "suicidal" and category_score >= 0.5:
+    if category and category.lower() == "suicidal" and category_score >= 0.75:
         if "1166" not in response:
             response = response.rstrip() + " " + CRISIS_RESOURCES
 
