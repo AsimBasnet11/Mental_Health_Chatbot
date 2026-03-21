@@ -173,9 +173,11 @@ def get_session(session_id, user_id=None):
     if len(sessions) > SESSION_MAX:
         _evict_stale_sessions()
 
-    _session_last_access[session_id] = time.time()
+    # Key includes user_id to prevent cross-user session leakage
+    cache_key = f"{user_id}:{session_id}" if user_id else session_id
+    _session_last_access[cache_key] = time.time()
 
-    if session_id not in sessions:
+    if cache_key not in sessions:
         history = ConversationHistory()
         if user_id:
             try:
@@ -189,8 +191,8 @@ def get_session(session_id, user_id=None):
                             else: history.add_assistant_message(row["content"])
             except Exception as e:
                 log.warning("Could not preload session %s: %s", session_id, e)
-        sessions[session_id] = history
-    return sessions[session_id]
+        sessions[cache_key] = history
+    return sessions[cache_key]
 
 
 app = FastAPI(title="Mental Health Chatbot API", version="7.0.0")
