@@ -114,15 +114,15 @@ def process_user_input(user_message, conversation_history):
     # Multi-response re-ranking only after 3+ turns and not for lists
     if _turn_count >= 3 and not is_list_req:
         candidates = [
-            llm.generate_response(chat_history, max_tokens=max_tok),
-            llm.generate_response(chat_history, max_tokens=max_tok),
+            llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, category=category, turn_count=_turn_count),
+            llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, category=category, turn_count=_turn_count),
         ]
         scores = [_diversity_score(c, _recent_aria) for c in candidates]
         best_idx = scores.index(max(scores))
         response = candidates[best_idx]
         _log.debug("Multi-response: scores=%s selected=%d", scores, best_idx)
     else:
-        response = llm.generate_response(chat_history, max_tokens=max_tok)
+        response = llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, category=category, turn_count=_turn_count)
 
     # Step 8: Safety Guardrails
     num_match = _re.search(

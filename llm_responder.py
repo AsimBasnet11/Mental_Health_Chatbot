@@ -14,6 +14,8 @@ import logging
 import urllib.request
 import urllib.error
 
+from followup_questions import FOLLOWUP_QUESTIONS
+
 log = logging.getLogger("mindcare.llm")
 
 
@@ -69,8 +71,18 @@ class LLMResponder:
         prompt += "<|assistant|>\n"
         return prompt
 
-    def _clean_response(self, text, user_message=None):
-        """Clean up model output, strip prompt tokens, remove user echoes, and match .html frontend post-processing."""
+    def _get_followup_question(self, emotion=None):
+        """Pick a relevant followup question based on emotion only.
+        Returns None if no emotion detected — no question appended in that case.
+        """
+        import random
+        if not emotion:
+            return None
+        key = emotion.lower() if emotion.lower() in FOLLOWUP_QUESTIONS else "default"
+        return random.choice(FOLLOWUP_QUESTIONS[key])
+
+    def _clean_response(self, text, user_message=None, emotion=None, turn_count=0):
+        """Clean up model output, strip prompt tokens, remove user echoes, flatten lists to paragraph."""
         import re
         text = text.strip()
         # Strip Aria prefix if echoed
@@ -85,33 +97,63 @@ class LLMResponder:
             text = text.split("\nAria:")[0].strip()
         # Remove echo of user message at the start (if present)
         if user_message:
-            # Remove if the response starts with the user message (ignoring case/whitespace)
             pattern = re.escape(user_message.strip())
             text = re.sub(rf'^\s*{pattern}\s*', '', text, flags=re.IGNORECASE)
 
-        # Limit to first 3 sentences, remove repeated sentences (like .html)
+        # Strip list intro phrases
+        text = re.sub(
+            r'(?i)here are some (suggestions|tips|steps|ways|things|recommendations|ideas)[^:]*:\s*',
+            '', text
+        )
+
+        # Flatten numbered/bulleted lists into plain sentences
+        text = re.sub(r'\n?\s*\d+[\.\)]\s+', ' ', text)
+        text = re.sub(r'\n?\s*[-•*]\s+', ' ', text)
+        text = re.sub(r'\s{2,}', ' ', text).strip()
+
+        # Limit to first 3 sentences, remove repeated + hallucinated sentences
         sentences = re.findall(r'[^.!?]+[.!?]+', text)
         if not sentences:
             sentences = [text]
+
+        # Hallucination signals — model pretending user already reacted
+        _HALLUCINATION_PATTERNS = re.compile(
+            r"i'?m glad (you|that you)|you'?ve found|as (you|we) (mentioned|discussed|talked)|"
+            r"as i (mentioned|said)|you told me|you shared (earlier|before)|"
+            r"glad to hear (you|that)|it('?s| is) good to (know|hear) that you",
+            re.IGNORECASE
+        )
+
         seen = set()
         filtered = []
         for s in sentences:
             trimmed = s.strip()
             lowered = trimmed.lower()
-            if lowered and lowered not in seen:
-                filtered.append(trimmed)
-                seen.add(lowered)
+            if not lowered:
+                continue
+            if lowered in seen:
+                continue
+            if _HALLUCINATION_PATTERNS.search(trimmed):
+                continue
+            filtered.append(trimmed)
+            seen.add(lowered)
             if len(filtered) >= 3:
                 break
         cleaned = ' '.join(filtered) if filtered else text
+
+        # Append followup question on 1st turn only when emotion detected
+        if turn_count == 1 and emotion:
+            followup = self._get_followup_question(emotion=emotion)
+            if followup:
+                cleaned = cleaned.rstrip() + ' ' + followup
         return cleaned
 
-    def generate_response(self, messages, max_tokens=300):
+    def generate_response(self, messages, max_tokens=300, emotion=None, category=None, turn_count=0):
         """
         Generate response. Accepts a list of messages (chat history), builds a chat-style prompt.
+        emotion + turn_count used for followup question on odd turns only.
         """
         formatted = self._build_llama3_prompt(messages)
-        # Get the latest user message for echo removal
         user_message = None
         for msg in reversed(messages):
             if msg.get("role") == "user":
@@ -121,7 +163,7 @@ class LLMResponder:
             raw = self._generate_remote(formatted, max_tokens=max_tokens)
         else:
             raw = self._generate_local(formatted, max_tokens=max_tokens)
-        return self._clean_response(raw, user_message=user_message)
+        return self._clean_response(raw, user_message=user_message, emotion=emotion, turn_count=turn_count)
 
     def _generate_local(self, formatted_prompt, max_tokens=300):
         """Generate response using local GGUF model."""
