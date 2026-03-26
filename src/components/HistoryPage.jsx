@@ -110,16 +110,16 @@ const HistoryPage = ({
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
       <Sidebar onHomeClick={onHomeClick} onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick} onFAQsClick={onFAQsClick} onSummaryClick={onSummaryClick}
         currentPage="history" user={user} onLogout={onLogout} onNewChat={onNewChat} />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
         {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div key={i} className="absolute bg-white rounded-full opacity-30 animate-pulse"
+            <div key={i} className="absolute bg-white rounded-full opacity-40 animate-pulse"
               style={{ width: `${Math.random()*2+1}px`, height: `${Math.random()*2+1}px`,
                 top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
                 animationDuration: `${Math.random()*3+2}s` }} />
@@ -155,7 +155,7 @@ const HistoryPage = ({
         {/* Clear Confirmation Modal */}
         {showClearConfirm && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#1a1035] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+            <div className="bg-[#1e1240] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
               <h3 className="text-xl font-bold text-white mb-3">Clear All Conversations?</h3>
               <p className="text-purple-300/80 mb-6">This will permanently delete all conversations and messages. This cannot be undone.</p>
               <div className="flex gap-3">
@@ -171,7 +171,7 @@ const HistoryPage = ({
         {/* Delete single confirmation */}
         {deleteId && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#1a1035] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+            <div className="bg-[#1e1240] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
               <h3 className="text-xl font-bold text-white mb-3">Delete Conversation?</h3>
               <p className="text-purple-300/80 mb-6">This conversation and all its messages will be permanently deleted.</p>
               <div className="flex gap-3">
@@ -210,8 +210,8 @@ const HistoryPage = ({
                 {conversations.map((conv, index) => (
                   <div key={conv.session_id}
                     onClick={() => loadMessages(conv.session_id)}
-                    className={`bg-[#1a1035]/60 border rounded-2xl p-4 backdrop-blur-md cursor-pointer transition-all animate-fadeIn hover:bg-[#1a1035]/80
-                      ${selectedConv?.session_id === conv.session_id ? 'border-purple-400/60 bg-[#1a1035]/90' : 'border-purple-500/20 hover:border-purple-500/40'}`}
+                    className={`bg-[#231550]/80 border rounded-2xl p-4 backdrop-blur-md cursor-pointer transition-all animate-fadeIn hover:bg-[#231550]/85
+                      ${selectedConv?.session_id === conv.session_id ? 'border-purple-400/60 bg-[#231550]/90' : 'border-purple-500/20 hover:border-purple-500/40'}`}
                     style={{ animationDelay: `${index * 40}ms` }}>
 
                     <div className="flex items-start justify-between mb-2">
@@ -279,7 +279,7 @@ const HistoryPage = ({
                       <div className={`inline-block px-4 py-2 rounded-2xl max-w-[75%] break-words whitespace-pre-line text-sm
                         ${msg.role === 'user'
                           ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                          : 'bg-[#1a1035]/60 border border-purple-500/20 text-purple-200'}`}>
+                          : 'bg-[#231550]/80 border border-purple-500/20 text-purple-100'}`}>
                         {msg.content}
                       </div>
                     </div>

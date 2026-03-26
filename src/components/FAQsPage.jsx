@@ -53,7 +53,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
 
       <Sidebar
         onHomeClick={onHomeClick}
@@ -65,14 +65,14 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
 
         {/* Animated Stars Background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(100)].map((_, i) => (
             <div
               key={i}
-              className="absolute bg-white rounded-full opacity-20 animate-pulse"
+              className="absolute bg-white rounded-full opacity-35 animate-pulse"
               style={{
                 width: `${Math.random() * 3 + 1}px`,
                 height: `${Math.random() * 3 + 1}px`,
@@ -115,7 +115,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
             {faqs.map((faq, index) => (
               <div
                 key={index}
-                className="bg-[#1a1035]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
+                className="bg-[#1e1240]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
               >
                 {/* Question */}
                 <button
@@ -141,7 +141,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
 
                 {/* Answer */}
                 {openIndex === index && (
-                  <div className="px-6 pb-4 pt-2 bg-[#0a0515]/50 border-t border-purple-500/20">
+                  <div className="px-6 pb-4 pt-2 bg-[#120820]/50 border-t border-purple-500/20">
                     <p className="text-purple-300/90 leading-relaxed whitespace-pre-line">
                       {faq.answer}
                     </p>

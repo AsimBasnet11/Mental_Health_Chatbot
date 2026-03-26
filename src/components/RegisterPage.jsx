@@ -37,10 +37,10 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
   const handleKeyPress = (e) => { if (e.key === 'Enter') handleRegister(); };
 
   return (
-    <div className="fixed inset-0 flex bg-[#0a0515] text-white items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 flex bg-[#120820] text-white items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0 pointer-events-none">
         {[...Array(100)].map((_, i) => (
-          <div key={i} className="absolute bg-white rounded-full opacity-20 animate-pulse"
+          <div key={i} className="absolute bg-white rounded-full opacity-35 animate-pulse"
             style={{ width: `${Math.random()*2.5+0.5}px`, height: `${Math.random()*2.5+0.5}px`,
               top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
               animationDuration: `${Math.random()*4+2}s`, animationDelay: `${Math.random()*2}s` }} />
@@ -50,7 +50,7 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
       <div className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] bg-purple-700/20 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md mx-4 mt-8 animate-fadeIn">
-        <div className="bg-[#1a1035]/70 backdrop-blur-xl border border-purple-500/20 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-purple-900/30">
+        <div className="bg-[#1e1240]/70 backdrop-blur-xl border border-purple-500/20 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-purple-900/30">
           <div className="text-center mb-3">
             <div className="mx-auto mb-1 animate-float">
               <img src={logo} alt="MindCare Logo" className="w-16 h-auto object-contain mx-auto animate-logoGlow" />
@@ -72,7 +72,7 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
                 <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400/50" />
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={handleKeyPress}
                   placeholder="Your name"
-                  className="w-full bg-[#0a0515]/50 border border-purple-500/25 rounded-xl pl-11 pr-4 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#0a0515]/70 transition-all duration-300" />
+                  className="w-full bg-[#120820]/50 border border-purple-500/25 rounded-xl pl-11 pr-4 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#120820]/70 transition-all duration-300" />
               </div>
             </div>
             <div>
@@ -81,7 +81,7 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
                 <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400/50" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyPress}
                   placeholder="you@example.com"
-                  className="w-full bg-[#0a0515]/50 border border-purple-500/25 rounded-xl pl-11 pr-4 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#0a0515]/70 transition-all duration-300" />
+                  className="w-full bg-[#120820]/50 border border-purple-500/25 rounded-xl pl-11 pr-4 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#120820]/70 transition-all duration-300" />
               </div>
             </div>
             <div>
@@ -90,7 +90,7 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
                 <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400/50" />
                 <input type={showPassword ? 'text' : 'password'} value={password}
                   onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyPress} placeholder="Min 6 characters"
-                  className="w-full bg-[#0a0515]/50 border border-purple-500/25 rounded-xl pl-11 pr-11 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#0a0515]/70 transition-all duration-300" />
+                  className="w-full bg-[#120820]/50 border border-purple-500/25 rounded-xl pl-11 pr-11 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#120820]/70 transition-all duration-300" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400/50 hover:text-purple-300 transition-colors">
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -103,7 +103,7 @@ const RegisterPage = ({ onLoginSuccess, onGoLogin }) => {
                 <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400/50" />
                 <input type={showConfirm ? 'text' : 'password'} value={confirm}
                   onChange={(e) => setConfirm(e.target.value)} onKeyDown={handleKeyPress} placeholder="••••••••"
-                  className="w-full bg-[#0a0515]/50 border border-purple-500/25 rounded-xl pl-11 pr-11 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#0a0515]/70 transition-all duration-300" />
+                  className="w-full bg-[#120820]/50 border border-purple-500/25 rounded-xl pl-11 pr-11 py-3 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400/60 focus:bg-[#120820]/70 transition-all duration-300" />
                 <button type="button" onClick={() => setShowConfirm(!showConfirm)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400/50 hover:text-purple-300 transition-colors">
                   {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}

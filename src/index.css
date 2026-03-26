@@ -1,3 +1,25 @@
+/* Custom Scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+  background: #1a1035;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a1f45;
+  border-radius: 8px;
+  border: 2px solid #1a1035;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a2f65;
+}
+::-webkit-scrollbar-corner {
+  background: #1a1035;
+}
+
+/* For Firefox */
+html {
+  scrollbar-color: #2a1f45 #1a1035;
+  scrollbar-width: thin;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,7 +35,7 @@ html, body {
   height: 100%;
 }
 body {
-  @apply bg-gradient-to-br from-[#0a0515] via-[#1a1035] to-[#1e1a3d] text-white;
+  @apply bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#252050] text-white;
 }
 
 /* Floating animation */

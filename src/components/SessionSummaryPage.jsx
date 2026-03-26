@@ -82,7 +82,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
       <Sidebar
         onHomeClick={onHomeClick}
         onMentalStateClick={onMentalStateClick}
@@ -95,10 +95,10 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
         onNewChat={onNewChat}
       />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div key={i} className="absolute bg-white rounded-full opacity-20 animate-pulse"
+            <div key={i} className="absolute bg-white rounded-full opacity-35 animate-pulse"
               style={{
                 width: `${Math.random() * 3 + 1}px`, height: `${Math.random() * 3 + 1}px`,
                 top: `${Math.random() * 100}%`, left: `${Math.random() * 100}%`,
@@ -151,7 +151,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
 
                 return (
                   <div key={conv.session_id}
-                    className="bg-[#1a1035]/60 border border-purple-500/20 rounded-2xl backdrop-blur-md hover:border-purple-500/40 transition-all overflow-hidden">
+                    className="bg-[#231550]/75 border border-purple-500/20 rounded-2xl backdrop-blur-md hover:border-purple-500/40 transition-all overflow-hidden">
 
                     <button
                       onClick={() => toggleSession(conv.session_id)}
@@ -162,7 +162,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                           <FaComments className="text-purple-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-semibold text-purple-200 truncate">{conv.title}</h3>
+                          <h3 className="text-sm font-semibold text-purple-100 truncate">{conv.title}</h3>
                           <div className="flex items-center gap-3 mt-1 text-xs text-purple-300/50">
                             <span className="flex items-center gap-1"><FaClock className="text-[10px]" /> {formatDate(conv.created_at)}</span>
                             <span className="flex items-center gap-1"><FaComments className="text-[10px]" /> {conv.message_count} msgs</span>
@@ -202,11 +202,11 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                             </div>
 
                             {(summary.top_emotions || []).length > 0 && (
-                              <div className="bg-[#0a0515]/40 rounded-xl p-4 border border-purple-500/10">
+                              <div className="bg-[#120820]/40 rounded-xl p-4 border border-purple-500/10">
                                 <div className="text-xs text-purple-400/70 uppercase tracking-wider mb-2">Top Emotions</div>
                                 <div className="flex flex-wrap gap-2">
                                   {summary.top_emotions.map((e, i) => (
-                                    <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-600/20 border border-purple-500/20 text-xs text-purple-200">
+                                    <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-600/20 border border-purple-500/20 text-xs text-purple-100">
                                       {capitalize(e.emotion)}
                                       <span className="text-purple-400/60">×{e.count}</span>
                                     </span>
@@ -235,7 +235,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
                             {summary.recommendation && (
                               <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl p-4 border border-purple-500/20">
                                 <div className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recommendation</div>
-                                <p className="text-sm text-purple-200 leading-relaxed">{summary.recommendation}</p>
+                                <p className="text-sm text-purple-100 leading-relaxed">{summary.recommendation}</p>
                               </div>
                             )}
                           </div>
@@ -248,7 +248,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
 
               <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6 mt-6">
                 <h3 className="text-lg font-semibold text-purple-300 mb-3">Remember</h3>
-                <p className="text-purple-200 leading-relaxed">
+                <p className="text-purple-100 leading-relaxed">
                   These summaries are AI-generated interpretations. They should not replace professional mental health evaluation.
                   If you're in crisis, please contact a mental health professional or crisis hotline.
                 </p>
@@ -262,7 +262,7 @@ const SessionSummaryPage = ({ onBack, onHomeClick, onMentalStateClick, onHistory
 };
 
 const StatCard = ({ label, value, className = 'text-purple-100', icon }) => (
-  <div className="bg-[#0a0515]/40 rounded-xl p-3 border border-purple-500/10">
+  <div className="bg-[#120820]/40 rounded-xl p-3 border border-purple-500/10">
     <div className="flex items-center gap-1.5 mb-1">
       {icon}
       <span className="text-[10px] text-purple-400/70 uppercase tracking-wider">{label}</span>
@@ -274,7 +274,7 @@ const StatCard = ({ label, value, className = 'text-purple-100', icon }) => (
 const DistressBar = ({ label, value }) => {
   const color = value > 70 ? 'bg-red-500' : value > 40 ? 'bg-yellow-400' : 'bg-green-400';
   return (
-    <div className="bg-[#0a0515]/40 rounded-xl p-3 border border-purple-500/10">
+    <div className="bg-[#120820]/40 rounded-xl p-3 border border-purple-500/10">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] text-purple-400/70 uppercase tracking-wider">{label}</span>
         <span className="text-xs font-bold text-purple-100">{value}%</span>

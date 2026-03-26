@@ -23,7 +23,7 @@ const Sidebar = ({
   const handleClick = (item) => { setActive(item.label); item.onClick?.(); };
 
   return (
-    <div className="w-40 h-screen bg-gradient-to-b from-[#0a0515] via-[#1a1035] to-[#0a0515] flex flex-col items-center py-4 gap-2 relative overflow-hidden">
+    <div className="w-40 h-screen bg-gradient-to-b from-[#120820] via-[#1e1240] to-[#120820] flex flex-col items-center py-4 gap-2 relative overflow-hidden">
 
       {/* Logo */}
       <div className="mb-1 relative shrink-0">
@@ -40,7 +40,7 @@ const Sidebar = ({
 
       {/* Nav Items */}
       <div className="flex-1 flex items-center justify-center w-full min-h-0">
-        <div className="bg-gradient-to-b from-[#2a1f45]/40 to-[#1a1035]/40 backdrop-blur-sm rounded-full p-3 border border-purple-500/20 max-w-[120px] animate-float">
+        <div className="bg-gradient-to-b from-[#2e2450]/55 to-[#1e1240]/55 backdrop-blur-sm rounded-full p-3 border border-purple-500/20 max-w-[120px] animate-float">
           <div className="flex flex-col gap-3">
             {navItems.map((item, index) => {
               const Icon = item.icon;
@@ -85,7 +85,7 @@ const Sidebar = ({
           </button>
 
           {showProfile && (
-            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1a1035]/95 backdrop-blur-xl border border-purple-500/30 rounded-xl p-3 min-w-[160px] shadow-2xl z-50 animate-fadeIn">
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#231550]/95 backdrop-blur-xl border border-purple-500/30 rounded-xl p-3 min-w-[160px] shadow-2xl z-50 animate-fadeIn">
               <div className="text-purple-200 text-sm font-medium mb-1 truncate">{user.name}</div>
               <div className="text-purple-400/60 text-xs mb-3 truncate">{user.email}</div>
               <button onClick={() => { setShowProfile(false); onLogout?.(); }}

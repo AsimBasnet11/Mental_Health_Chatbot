@@ -140,8 +140,21 @@ def _get_chunks(text, tokenizer):
 
 def _infer_best_chunk(text, tokenizer, model):
     chunks = _get_chunks(text, tokenizer)
-    best_probs = None
-    best_confidence = 0.0
+
+    if len(chunks) == 1:
+        # Short text — single inference, no averaging needed
+        enc = tokenizer(
+            chunks[0], max_length=MAX_LEN, padding="max_length",
+            truncation=True, return_tensors="pt"
+        ).to(device)
+        with torch.no_grad():
+            return F.softmax(model(**enc).logits, dim=-1)[0].cpu().numpy()
+
+    # Long text — ensemble: weighted average of all chunk probabilities.
+    # Weight each chunk by its top confidence so high-signal chunks
+    # contribute more than low-signal / ambiguous ones.
+    all_probs = []
+    all_weights = []
 
     for chunk in chunks:
         enc = tokenizer(
@@ -151,16 +164,21 @@ def _infer_best_chunk(text, tokenizer, model):
         with torch.no_grad():
             probs = F.softmax(model(**enc).logits, dim=-1)[0].cpu().numpy()
         top_conf = float(probs.max())
-        if top_conf > best_confidence:
-            best_confidence = top_conf
-            best_probs = probs
+        all_probs.append(probs)
+        all_weights.append(top_conf)
 
-    return best_probs
+    # Weighted average across chunks
+    weights = np.array(all_weights)
+    weights = weights / weights.sum()  # normalise to sum=1
+    ensemble_probs = np.sum([w * p for w, p in zip(weights, all_probs)], axis=0)
+    log.debug("Ensemble over %d chunks, weights: %s", len(chunks), np.round(weights, 3))
+    return ensemble_probs
 
 
 def _infer_emotion_probs(text, tokenizer, model):
     sentences = [s.strip() for s in re.split(r'[.!?]', text) if s.strip()]
-    focused_text = '. '.join(sentences[-2:]) if len(sentences) > 2 else text
+    # Use last 3 sentences for longer texts, full text if short
+    focused_text = '. '.join(sentences[-3:]) if len(sentences) > 3 else text
 
     enc = tokenizer(
         focused_text, max_length=128, padding="max_length",
@@ -168,6 +186,47 @@ def _infer_emotion_probs(text, tokenizer, model):
     ).to(device)
     with torch.no_grad():
         probs = F.softmax(model(**enc).logits, dim=-1)[0].cpu().numpy()
+    return probs
+
+
+# ── Suicidal keyword safety net ──────────────────────────────
+# The model is strong but not perfect on safety-critical cases.
+# These keywords act as a FLOOR — they can raise the suicidal score
+# but never suppress it. Triggered only when model confidence is low.
+_SUICIDAL_KEYWORDS = re.compile(
+    r"\b(kill\s*(my|him|her|them)?self|suicide|suicidal|end\s*my\s*life"
+    r"|want\s*to\s*die|don'?t\s*want\s*to\s*(live|exist)|no\s*reason\s*to\s*live"
+    r"|better\s*off\s*(dead|without\s*me)|take\s*my\s*(own\s*)?life"
+    r"|can'?t\s*go\s*on|not\s*worth\s*living|goodbye\s*forever)\b",
+    re.IGNORECASE,
+)
+
+SUICIDAL_KEYWORD_FLOOR = 0.55  # minimum suicidal confidence if keywords found
+
+
+def _apply_suicidal_safety_net(probs, text):
+    """If strong suicidal keywords are detected but model confidence is low,
+    raise suicidal score to a safe floor and renormalise.
+    This is a safety net — it never suppresses an already high score."""
+    if not _SUICIDAL_KEYWORDS.search(text):
+        return probs
+
+    current_suicidal = float(probs[SUICIDAL_IDX])
+    if current_suicidal >= SUICIDAL_KEYWORD_FLOOR:
+        return probs  # model already caught it
+
+    log.warning("Suicidal keyword detected — raising confidence floor from %.2f to %.2f",
+                current_suicidal, SUICIDAL_KEYWORD_FLOOR)
+
+    probs = probs.copy()
+    boost = SUICIDAL_KEYWORD_FLOOR - current_suicidal
+    # Distribute the boost reduction proportionally from non-suicidal labels
+    other_sum = 1.0 - current_suicidal
+    if other_sum > 0:
+        for i in range(len(probs)):
+            if i != SUICIDAL_IDX:
+                probs[i] -= boost * (probs[i] / other_sum)
+    probs[SUICIDAL_IDX] = SUICIDAL_KEYWORD_FLOOR
     return probs
 
 
@@ -203,6 +262,7 @@ def classify_mental_health(text):
 
     expanded = _expand_short_text(cleaned)
     probs = _infer_best_chunk(expanded, tokenizer, model)
+    probs = _apply_suicidal_safety_net(probs, cleaned)
     top_idx = int(np.argmax(probs))
     return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]))
 
@@ -220,6 +280,7 @@ def classify_mental_health_with_scores(text):
 
     expanded = _expand_short_text(cleaned)
     probs = _infer_best_chunk(expanded, tokenizer, model)
+    probs = _apply_suicidal_safety_net(probs, cleaned)
     top_idx = int(np.argmax(probs))
     all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(probs)}
     return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]), all_scores)
@@ -246,6 +307,7 @@ def analyze_full(text):
     # Sentiment
     s_tok, s_model = _load_sentiment_model()
     s_probs = _infer_best_chunk(expanded, s_tok, s_model)
+    s_probs = _apply_suicidal_safety_net(s_probs, cleaned)
     s_top_idx = int(np.argmax(s_probs))
     s_label = SENTIMENT_LABELS[s_top_idx]
     s_conf = float(s_probs[s_top_idx])

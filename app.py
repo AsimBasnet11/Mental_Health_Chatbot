@@ -182,13 +182,42 @@ def get_session(session_id, user_id=None):
         if user_id:
             try:
                 with get_db() as conn:
-                    conv = conn.execute("SELECT id FROM conversations WHERE session_id=? AND user_id=?",
+                    conv = conn.execute(
+                        "SELECT id FROM conversations WHERE session_id=? AND user_id=?",
                         (session_id, user_id)).fetchone()
                     if conv:
-                        for row in conn.execute("SELECT role, content FROM messages WHERE conversation_id=? ORDER BY timestamp ASC",
+                        # Load analysis scores keyed by user_text for restoration
+                        analysis_rows = conn.execute(
+                            """SELECT user_text, mental_label, mental_conf,
+                               emotion_label, emotion_conf
+                               FROM analysis_history
+                               WHERE session_id=? AND user_id=?
+                               ORDER BY timestamp ASC""",
+                            (session_id, user_id)).fetchall()
+                        # Build lookup: user_text -> scores
+                        _score_map = {}
+                        for ar in analysis_rows:
+                            _score_map[ar["user_text"][:200]] = {
+                                "category": ar["mental_label"],
+                                "category_score": ar["mental_conf"] or 0.0,
+                                "emotion": ar["emotion_label"],
+                                "emotion_score": ar["emotion_conf"] or 0.0,
+                            }
+                        # Load messages with scores where available
+                        for row in conn.execute(
+                            "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY timestamp ASC",
                             (conv["id"],)).fetchall():
-                            if row["role"] == "user": history.add_user_message(row["content"])
-                            else: history.add_assistant_message(row["content"])
+                            if row["role"] == "user":
+                                scores = _score_map.get(row["content"][:200], {})
+                                history.add_user_message(
+                                    row["content"],
+                                    emotion=scores.get("emotion"),
+                                    emotion_score=scores.get("emotion_score", 0.0),
+                                    category=scores.get("category"),
+                                    category_score=scores.get("category_score", 0.0),
+                                )
+                            else:
+                                history.add_assistant_message(row["content"])
             except Exception as e:
                 log.warning("Could not preload session %s: %s", session_id, e)
         sessions[cache_key] = history

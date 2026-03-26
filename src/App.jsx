@@ -239,14 +239,14 @@ function App() {
 
   // Home (Chat) Page
   return (
-    <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
       <Sidebar {...navProps} currentPage={currentPage} />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
         {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div key={i} className="absolute bg-white rounded-full opacity-30 animate-pulse"
+            <div key={i} className="absolute bg-white rounded-full opacity-40 animate-pulse"
               style={{ width: `${Math.random()*2+1}px`, height: `${Math.random()*2+1}px`,
                 top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
                 animationDuration: `${Math.random()*3+2}s` }} />
@@ -277,7 +277,7 @@ function App() {
               <div className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line
                 ${msg.sender === 'user'
                   ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                  : 'bg-[#1a1035]/60 border border-purple-500/20 text-purple-200 animate-slideUp'}`}
+                  : 'bg-[#231550]/80 border border-purple-500/30 text-purple-100 animate-slideUp'}`}
                 style={{ maxWidth: '70%' }}>
                 {msg.text}
               </div>
@@ -286,8 +286,8 @@ function App() {
 
           {isTyping && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-300 mr-2">Bot is typing</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/80 border border-purple-500/30 animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-purple-200 mr-2">Bot is typing</span>
                 <div className="flex items-center space-x-1">
                   <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce"></span>
                   <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-200"></span>
@@ -299,8 +299,8 @@ function App() {
 
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-300 mr-2">Analyzing emotions</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/80 border border-purple-500/30 animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-purple-200 mr-2">Analyzing emotions</span>
                 <div className="flex items-center space-x-1">
                   <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
                   <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200"></span>

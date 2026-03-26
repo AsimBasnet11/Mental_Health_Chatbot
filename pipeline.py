@@ -1,27 +1,14 @@
-"""
-Full Pipeline (Task 5)
-Connects every component in the correct order.
-This is the core engine of the chatbot.
+import re as _re
+import logging as _logging
 
-Components connected:
-1. Input Gate → 2. Emotion Detection → 3. Mental Health Classification →
-4. Conversation History → 5. RAG Search → 6. Prompt Builder →
-7. LLM Response → 8. Safety Guardrails → 9. Return result
-
-Note: Emotion Detection and Mental Health Classification models are assumed
-to already exist. This module provides stub functions that should be replaced
-with the actual model inference calls from the existing completed components.
-"""
-
-import os
 from input_gate import check_input
 from prompt_builder import build_prompt
 from safety_guardrails import apply_safety_guardrails
 from conversation_history import ConversationHistory
 from session_summary import generate_session_summary
-from detection import detect_emotion, classify_mental_health, classify_mental_health_with_scores
+from detection import detect_emotion, classify_mental_health_with_scores
 
-# These are loaded lazily to avoid slow imports at module level
+_log = _logging.getLogger("mindcare.pipeline")
 _llm_responder = None
 
 
@@ -32,12 +19,6 @@ def _get_llm_responder():
         _llm_responder = LLMResponder()
     return _llm_responder
 
-
-# detect_emotion and classify_mental_health are imported from detection.py
-# They use the trained models in Detection/Goemotion-detection/ and Detection/Sentimental-analysis/
-
-
-# ── Statuses where gate response is used directly (skip LLM) ──
 _GATE_RESPONSE_STATUSES = {
     "greeting", "too_short", "off_topic",
     "hard_refuse", "harmful_validation", "unsafe_advice", "dependency",
@@ -47,7 +28,6 @@ _GATE_RESPONSE_STATUSES = {
     "harmful_coping", "stigma", "persistence", "aggression", "responsibility",
 }
 
-# ── Statuses where detection still runs (for Mental State page) ──
 _RUN_DETECTION_STATUSES = {
     "proceed", "crisis_1", "crisis_2", "crisis_3",
     "harmful_validation", "dependency", "hidden_intent",
@@ -55,18 +35,27 @@ _RUN_DETECTION_STATUSES = {
     "delusion", "minimization", "harmful_coping",
 }
 
-# ─── MAIN PIPELINE ──────────────────────────────────────────────────
+def _diversity_score(resp, recent):
+    """Score response diversity vs recent responses. Higher = more diverse."""
+    if not recent:
+        return 1.0
+    resp_words = set(resp[:60].lower().split())
+    overlaps = [
+        len(resp_words & set(r.split())) / max(len(resp_words), 1)
+        for r in recent
+    ]
+    return 1.0 - (sum(overlaps) / len(overlaps))
+
 
 def process_user_input(user_message, conversation_history):
-    """Main pipeline function that processes a user message end to end."""
-    import re as _re
+    """Main pipeline function: all features active, LLM gets raw chat history."""
 
-    # Step 1: Input Gate — pass history so short contextual replies go to LLM
+    # Step 1: Input Gate
     has_history = len(conversation_history) > 0
     gate_result = check_input(user_message, has_history=has_history)
     status = gate_result["status"]
 
-    # Step 2 & 3: Detection — run for meaningful/crisis messages only
+    # Step 2 & 3: Detection
     if status in _RUN_DETECTION_STATUSES:
         emotion, emotion_score = detect_emotion(user_message)
         category, category_score, all_scores = classify_mental_health_with_scores(user_message)
@@ -75,7 +64,6 @@ def process_user_input(user_message, conversation_history):
         category, category_score, all_scores = None, 0.0, {}
 
     if status != "proceed":
-        # Gate response — store and return
         conversation_history.add_user_message(
             user_message, emotion, emotion_score, category, category_score
         )
@@ -91,46 +79,69 @@ def process_user_input(user_message, conversation_history):
             "gate_status": status,
         }
 
-    # Step 4: Store in conversation history
+    # Step 4: Store user message
     conversation_history.add_user_message(
         user_message, emotion, emotion_score, category, category_score
     )
 
-    # Step 5: Build Prompt
+    # Step 5: Build raw chat-style prompt from conversation history.
+    # get_safe_history() already includes the user message stored in Step 4,
+    # so we just slice the last 6 messages — no manual append needed.
     history_for_prompt = conversation_history.get_safe_history()
-    prompt = build_prompt(
-        user_message, emotion, emotion_score,
-        category, category_score, history_for_prompt
-    )
+    chat_history = history_for_prompt[-6:]
 
-    # Step 6: Dynamic max_tokens — more for list requests
-    _is_list_req = _re.search(
-        r'\b(list|lists|steps|tips|ways|remedies|techniques|strategies|methods|\d+\s*items?)\b',
+    # Step 6: Dynamic max_tokens
+    is_list_req = _re.search(
+        r'\b(list|lists|tip|tips|step|steps|way|ways|method|methods|'
+        r'remedies|remedy|strateg(?:y|ies)|technique|techniques|bullet|bullets)\b',
         user_message, _re.IGNORECASE
     )
-    _max_tok = 700 if _is_list_req else 300
+    max_tok = 600 if is_list_req else 280
 
-    # Step 7: LLM Response
+    # Step 7: LLM — collect recent aria responses for diversity check
+    _recent_aria = [
+        m["content"][:60].lower()
+        for m in conversation_history.messages
+        if m.get("role") == "assistant"
+    ][-3:]
+
+    _turn_count = sum(
+        1 for m in conversation_history.messages if m.get("role") == "user"
+    )
+
     llm = _get_llm_responder()
-    response = llm.generate_response(prompt, max_tokens=_max_tok)
 
-    # Step 8: Safety Guardrails — detect requested list count
-    _num_match = _re.search(
-        r'\b(\d+)\s*(items?|points?|tips?|ways?|steps?|remedies|things|list)\b|\b(give|show|list)\s+me\s+(\d+)\b',
+    # Multi-response re-ranking only after 3+ turns and not for lists
+    if _turn_count >= 3 and not is_list_req:
+        candidates = [
+            llm.generate_response(chat_history, max_tokens=max_tok),
+            llm.generate_response(chat_history, max_tokens=max_tok),
+        ]
+        scores = [_diversity_score(c, _recent_aria) for c in candidates]
+        best_idx = scores.index(max(scores))
+        response = candidates[best_idx]
+        _log.debug("Multi-response: scores=%s selected=%d", scores, best_idx)
+    else:
+        response = llm.generate_response(chat_history, max_tokens=max_tok)
+
+    # Step 8: Safety Guardrails
+    num_match = _re.search(
+        r'\b(\d+)\s*(items?|points?|tips?|ways?|steps?|remedies|things|list)\b'
+        r'|\b(give|show|list)\s+me\s+(\d+)\b',
         user_message, _re.IGNORECASE
     )
-    _requested_count = None
-    if _num_match:
-        _num_str = _num_match.group(1) or _num_match.group(4)
-        if _num_str:
-            _requested_count = int(_num_str)
+    requested_count = None
+    if num_match:
+        num_str = num_match.group(1) or num_match.group(4)
+        if num_str:
+            requested_count = int(num_str)
 
     response = apply_safety_guardrails(
         response, emotion_score, category_score,
-        category=category, requested_list_count=_requested_count
+        category=category, requested_list_count=requested_count
     )
 
-    # Step 9: Store AI response in history
+    # Step 9: Store AI response
     conversation_history.add_assistant_message(response)
 
     return {
@@ -146,14 +157,7 @@ def process_user_input(user_message, conversation_history):
 
 
 def end_session(conversation_history):
-    """Generate session summary when user ends the conversation.
-
-    Args:
-        conversation_history: ConversationHistory instance or list.
-
-    Returns:
-        dict with session summary data.
-    """
+    """Generate session summary."""
     try:
         if hasattr(conversation_history, 'get_all'):
             history_list = conversation_history.get_all()
@@ -164,33 +168,21 @@ def end_session(conversation_history):
         else:
             history_list = []
 
-        # Debug logging — check what we actually received
-        import logging
-        _log = logging.getLogger("mindcare.pipeline")
-        _log.info("end_session: total messages = %d", len(history_list))
         user_msgs = [m for m in history_list if m.get("role") == "user"]
-        _log.info("end_session: user messages = %d", len(user_msgs))
-        if user_msgs:
-            sample = user_msgs[0]
-            _log.info("end_session: first user msg keys = %s", list(sample.keys()))
-            _log.info("end_session: emotion=%s category=%s score=%s",
-                      sample.get("emotion"), sample.get("category"), sample.get("category_score"))
-        else:
-            _log.warning("end_session: NO user messages found — summary will be empty")
+        _log.info("end_session: %d user messages", len(user_msgs))
 
         return generate_session_summary(history_list)
     except Exception as e:
-        import logging
-        logging.getLogger("mindcare.pipeline").error("end_session failed: %s", e)
+        _log.error("end_session failed: %s", e)
         return {
             "primary_emotion": "N/A",
             "primary_category": "N/A",
             "trend": "N/A",
             "start_score": 0,
             "end_score": 0,
-            "recommendation": "Unable to generate summary. Please try again.",
+            "recommendation": "Unable to generate summary.",
             "message_count": 0,
-            "summary_text": "Summary could not be generated for this session.",
+            "summary_text": "Summary could not be generated.",
             "top_emotions": [],
             "avg_distress": 0,
             "risk_flags": [],

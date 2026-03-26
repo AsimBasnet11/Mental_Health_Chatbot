@@ -681,7 +681,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   }, []);
 
   return (
-    <div className="flex h-screen bg-[#0a0515] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
       
       <Sidebar 
         onHomeClick={onHomeClick}
@@ -693,13 +693,13 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#0a0515] via-[#140a2e] to-[#0a0515]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
 
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
             <div 
               key={i} 
-              className="absolute bg-white rounded-full opacity-30 animate-pulse"
+              className="absolute bg-white rounded-full opacity-40 animate-pulse"
               style={{
                 width: `${Math.random() * 2 + 1}px`,
                 height: `${Math.random() * 2 + 1}px`,
@@ -748,7 +748,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               onClick={() => { setTtsEnabled(prev => { const next = !prev; ttsEnabledRef.current = next; if (!next) { window.speechSynthesis.cancel(); if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; } } return next; }); setIsSpeaking(false); }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
                 ${ttsEnabled
-                  ? 'bg-purple-600/40 border-purple-400/40 text-purple-200'
+                  ? 'bg-purple-600/40 border-purple-400/40 text-purple-100'
                   : 'bg-gray-600/40 border-gray-500/30 text-gray-400'}`}
               title={ttsEnabled ? 'Mute voice responses' : 'Unmute voice responses'}
             >
@@ -760,7 +760,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           {/* End Session */}
           {!sessionEnded && messages.length > 1 && (
             <button onClick={handleEndSession}
-              className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-200 text-sm hover:bg-purple-600/50 transition-all">
+              className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-100 text-sm hover:bg-purple-600/50 transition-all">
               End Session
             </button>
           )}
@@ -783,7 +783,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
                 className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line
                   ${msg.isUser
                     ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                    : 'bg-[#1a1035]/60 border border-purple-500/20 text-purple-200 animate-slideUp'}`}
+                    : 'bg-[#231550]/75 border border-purple-500/20 text-purple-100 animate-slideUp'}`}
                 style={{ maxWidth: '70%' }}
               >
                 {msg.text}
@@ -818,7 +818,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/75 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
                 <span className="text-purple-300 mr-2">Analyzing emotions</span>
                 <div className="flex items-center space-x-1">
                   <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
@@ -831,7 +831,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           {isTyping && !isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#1a1035]/60 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/75 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
                 <span className="text-purple-300 mr-2">Bot is typing</span>
                 <div className="flex items-center space-x-1">
                   <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce"></span>
