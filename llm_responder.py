@@ -64,10 +64,14 @@ class LLMResponder:
         """
         prompt = ""
         for msg in messages:
-            if msg.get("role") == "user":
-                prompt += "<|user|>\n" + msg.get("content", "").strip() + "\n"
+            role = msg.get("role")
+            content = msg.get("content", "").strip()
+            if role == "system":
+                prompt += "<|system|>\n" + content + "\n"
+            elif role == "user":
+                prompt += "<|user|>\n" + content + "\n"
             else:
-                prompt += "<|assistant|>\n" + msg.get("content", "").strip() + "\n"
+                prompt += "<|assistant|>\n" + content + "\n"
         prompt += "<|assistant|>\n"
         return prompt
 
@@ -82,73 +86,76 @@ class LLMResponder:
         return random.choice(FOLLOWUP_QUESTIONS[key])
 
     def _clean_response(self, text, user_message=None, emotion=None, turn_count=0):
-        """Clean up model output, strip prompt tokens, remove user echoes, flatten lists to paragraph."""
+        """
+        Clean model output for MentalChat16K counselor model.
+        - Strips prompt tokens and echoes only
+        - No sentence cap — counselor responses are meant to be long
+        - No list flattening — model outputs prose
+        - Deduplicates repeated sentences
+        """
         import re
         text = text.strip()
-        # Strip Aria prefix if echoed
-        if text.lower().startswith("aria:"):
-            text = text[5:].strip()
-        # Remove <|user|> and <|assistant|> tokens
-        text = re.sub(r'<\|user\|>|<\|assistant\|>', '', text)
-        # Remove extra turns
-        if "User:" in text:
-            text = text.split("User:")[0].strip()
-        if "\nAria:" in text:
-            text = text.split("\nAria:")[0].strip()
-        # Remove echo of user message at the start (if present)
+
+        # Strip prompt token leakage
+        text = re.sub(r'<\|user\|>|<\|assistant\|>|<\|system\|>', '', text)
+
+        # Remove extra turns if model continued generating
+        # Split on any of these markers — take only what comes before
+        import re as _re
+        text = _re.split(
+            r'\n(?:User|Human|Patient|Counselor)\s*:',
+            text, maxsplit=1
+        )[0].strip()
+        # Also catch inline (no newline) versions
+        for marker in ("User:", "Human:", "Patient:", "Counselor (continued):"):
+            if marker in text:
+                text = text.split(marker)[0].strip()
+
+        # Remove echo of user message at the start
         if user_message:
             pattern = re.escape(user_message.strip())
             text = re.sub(rf'^\s*{pattern}\s*', '', text, flags=re.IGNORECASE)
 
-        # Strip list intro phrases
-        text = re.sub(
-            r'(?i)here are some (suggestions|tips|steps|ways|things|recommendations|ideas)[^:]*:\s*',
-            '', text
-        )
-
-        # Flatten numbered/bulleted lists into plain sentences
-        text = re.sub(r'\n?\s*\d+[\.\)]\s+', ' ', text)
-        text = re.sub(r'\n?\s*[-•*]\s+', ' ', text)
         text = re.sub(r'\s{2,}', ' ', text).strip()
 
-        # Limit to first 3 sentences, remove repeated + hallucinated sentences
-        sentences = re.findall(r'[^.!?]+[.!?]+', text)
-        if not sentences:
-            sentences = [text]
-
-        # Hallucination signals — model pretending user already reacted
+        # Deduplicate repeated sentences (repetition loop guard)
         _HALLUCINATION_PATTERNS = re.compile(
             r"i'?m glad (you|that you)|you'?ve found|as (you|we) (mentioned|discussed|talked)|"
             r"as i (mentioned|said)|you told me|you shared (earlier|before)|"
             r"glad to hear (you|that)|it('?s| is) good to (know|hear) that you",
             re.IGNORECASE
         )
-
+        sentences = re.split(r'(?<=[.!?])\s+', text)
         seen = set()
         filtered = []
         for s in sentences:
-            trimmed = s.strip()
-            lowered = trimmed.lower()
+            lowered = s.strip().lower()
             if not lowered:
                 continue
             if lowered in seen:
                 continue
-            if _HALLUCINATION_PATTERNS.search(trimmed):
+            if _HALLUCINATION_PATTERNS.search(s):
                 continue
-            filtered.append(trimmed)
+            # Skip sentences that are just a numbered list opener cut off mid-way
+            # e.g. "Here are some suggestions: 1." or ending with a bare number
+            if re.search(r'(:\s*\d+\.?\s*$|^\d+\.\s*$)', s.strip()):
+                continue
+            filtered.append(s.strip())
             seen.add(lowered)
-            if len(filtered) >= 3:
-                break
+
         cleaned = ' '.join(filtered) if filtered else text
 
-        # Append followup question on 1st turn only when emotion detected
-        if turn_count == 1 and emotion:
+        # Sentence 5: append followup question when emotion detected
+        sents = re.split(r'(?<=[.!?])\s+', cleaned.strip())
+        sents = [s for s in sents if s.strip()]
+        if emotion and len(sents) >= 4:
             followup = self._get_followup_question(emotion=emotion)
-            if followup:
+            if followup and not cleaned.rstrip().endswith("?"):
                 cleaned = cleaned.rstrip() + ' ' + followup
+
         return cleaned
 
-    def generate_response(self, messages, max_tokens=300, emotion=None, category=None, turn_count=0):
+    def generate_response(self, messages, max_tokens=512, emotion=None, category=None, turn_count=0):
         """
         Generate response. Accepts a list of messages (chat history), builds a chat-style prompt.
         emotion + turn_count used for followup question on odd turns only.
@@ -165,44 +172,49 @@ class LLMResponder:
             raw = self._generate_local(formatted, max_tokens=max_tokens)
         return self._clean_response(raw, user_message=user_message, emotion=emotion, turn_count=turn_count)
 
-    def _generate_local(self, formatted_prompt, max_tokens=300):
+    def _generate_local(self, formatted_prompt, max_tokens=512):
         """Generate response using local GGUF model."""
         output = self.llm(
             formatted_prompt,
             max_tokens=max_tokens,
-            temperature=0.7,
+            temperature=0.35,
             top_p=0.9,
-            top_k=20,
-            repeat_penalty=1.18,          # raised: 1.1 → 1.18 to kill repetition loops
-            presence_penalty=0.1,          # new: penalise tokens already seen in prompt
-            frequency_penalty=0.05,        # new: mild penalty for repeated tokens
+            top_k=45,
+            repeat_penalty=1.3,
+            presence_penalty=0.1,
+            frequency_penalty=0.05,
             stop=[
-                "User:", "Human:", "Aria:",
+                "User:", "Human:", "Aria:", "Patient:",
                 "<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>",
-                "\nUser:", "\nHuman:",      # catch newline-prefixed echoes
+                "\nUser:", "\nHuman:", "\nPatient:",
+                "Counselor (continued):",
+                "I'd encourage you to speak",  # repetitive closing the model overuses
             ],
             echo=False
         )
         raw = output["choices"][0]["text"]
 
-        # Safety net: if output is a repetition loop, return fallback early.
-        # Check on raw before generate_response does the final clean.
+        # Safety net: repetition loop detection.
+        # Use 6-word window and require 4+ repeats to avoid false positives
+        # on short but valid counselor responses.
         words = raw.split()
-        if len(words) >= 6:
-            window = " ".join(words[:4]).lower()
-            if raw.lower().count(window) >= 3:
-                log.warning("Repetition loop detected in output — returning fallback")
-                return ""  # pipeline will regenerate or guardrails will expand
-        return raw  # generate_response() calls _clean_response() once with user_message
+        if len(words) >= 12:
+            window = " ".join(words[:6]).lower()
+            if raw.lower().count(window) >= 4:
+                log.warning("Repetition loop detected — returning fallback")
+                return ""
+        return raw
 
-    def _generate_remote(self, formatted_prompt, max_tokens=300):
+    def _generate_remote(self, formatted_prompt, max_tokens=512):
         """Generate response by calling Kaggle LLM API."""
         log.debug("Sending prompt:\n%s", formatted_prompt)
         url = f"{self.remote_url}/generate"
         payload = json.dumps({
             "prompt": formatted_prompt,
             "max_tokens": max_tokens,
-            "temperature": 0.75
+            "temperature": 0.35,
+            "top_k": 45,
+            "repeat_penalty": 1.3,
         }).encode("utf-8")
 
         req = urllib.request.Request(

@@ -33,6 +33,7 @@ class ConversationHistory:
         """Return history that fits within token budget.
         Estimates tokens as word_count * 1.3.
         Always keeps at least the last 2 messages.
+        Only returns role + content — strips metadata keys.
         """
         history = self.messages[:]
         while len(history) > 2:
@@ -41,7 +42,7 @@ class ConversationHistory:
             if estimated_tokens <= max_tokens:
                 break
             history.pop(0)
-        return history
+        return [{"role": m["role"], "content": m["content"]} for m in history]
 
     def get_all(self):
         return self.messages[:]

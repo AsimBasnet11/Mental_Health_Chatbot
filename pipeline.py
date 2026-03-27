@@ -52,7 +52,7 @@ def process_user_input(user_message, conversation_history):
 
     # Step 1: Input Gate
     has_history = len(conversation_history) > 0
-    gate_result = check_input(user_message, has_history=has_history)
+    gate_result = check_input(user_message, has_history=has_history, llm_instance=_get_llm_responder())
     status = gate_result["status"]
 
     # Step 2 & 3: Detection
@@ -84,19 +84,15 @@ def process_user_input(user_message, conversation_history):
         user_message, emotion, emotion_score, category, category_score
     )
 
-    # Step 5: Build raw chat-style prompt from conversation history.
-    # get_safe_history() already includes the user message stored in Step 4,
-    # so we just slice the last 6 messages — no manual append needed.
+    # Step 5: Build chat history with MentalChat16K system prompt prepended.
+    # Matches the exact instruction the counselor model was trained on.
+    from prompt_builder import SYSTEM_PROMPT
     history_for_prompt = conversation_history.get_safe_history()
-    chat_history = history_for_prompt[-6:]
+    chat_history = [{"role": "system", "content": SYSTEM_PROMPT}] + history_for_prompt[-6:]
 
-    # Step 6: Dynamic max_tokens
-    is_list_req = _re.search(
-        r'\b(list|lists|tip|tips|step|steps|way|ways|method|methods|'
-        r'remedies|remedy|strateg(?:y|ies)|technique|techniques|bullet|bullets)\b',
-        user_message, _re.IGNORECASE
-    )
-    max_tok = 600 if is_list_req else 280
+    # Step 6: max_tokens — counselor model needs room for full responses
+    is_list_req = False   # MentalChat16K model outputs prose, not lists
+    max_tok = 512
 
     # Step 7: LLM — collect recent aria responses for diversity check
     _recent_aria = [
@@ -137,8 +133,9 @@ def process_user_input(user_message, conversation_history):
             requested_count = int(num_str)
 
     response = apply_safety_guardrails(
-        response, emotion_score, category_score,
-        category=category, requested_list_count=requested_count
+        response, category_score,
+        category=category, requested_list_count=requested_count,
+        crisis_level=gate_result.get("crisis_level", 0)
     )
 
     # Step 9: Store AI response
