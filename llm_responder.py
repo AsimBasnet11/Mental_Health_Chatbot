@@ -9,6 +9,7 @@ System prompt is SHORT. Few-shot + history goes in user turn.
 """
 
 import os
+import re
 import json
 import logging
 import urllib.request
@@ -160,6 +161,13 @@ class LLMResponder:
         Generate response. Accepts a list of messages (chat history), builds a chat-style prompt.
         emotion + turn_count used for followup question on odd turns only.
         """
+        _ERROR_STRINGS = (
+            "something went wrong",
+            "server error",
+            "please try again",
+            "having trouble connecting",
+        )
+
         formatted = self._build_llama3_prompt(messages)
         user_message = None
         for msg in reversed(messages):
@@ -170,7 +178,40 @@ class LLMResponder:
             raw = self._generate_remote(formatted, max_tokens=max_tokens)
         else:
             raw = self._generate_local(formatted, max_tokens=max_tokens)
-        return self._clean_response(raw, user_message=user_message, emotion=emotion, turn_count=turn_count)
+
+        # Block error strings from reaching the user
+        if any(e in raw.lower() for e in _ERROR_STRINGS):
+            raw = ""
+
+        cleaned = self._clean_response(raw, user_message=user_message, emotion=emotion, turn_count=turn_count)
+
+        # Repetition guard — if response is too similar to last assistant message,
+        # re-generate once with slightly rephrased instruction instead of a generic fallback
+        last_assistant = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                last_assistant = msg.get("content", "")
+                break
+
+        if last_assistant and cleaned:
+            overlap = len(
+                set(cleaned.lower().split()) & set(last_assistant.lower().split())
+            ) / max(len(set(cleaned.lower().split())), 1)
+            if overlap > 0.6:
+                # Re-generate with an explicit nudge to respond differently
+                nudged = messages + [{
+                    "role": "system",
+                    "content": "Your previous response was very similar to what you just said. Please respond differently — use different words, a different angle, or ask something new."
+                }]
+                nudged_prompt = self._build_llama3_prompt(nudged)
+                if self.remote_url:
+                    raw2 = self._generate_remote(nudged_prompt, max_tokens=max_tokens)
+                else:
+                    raw2 = self._generate_local(nudged_prompt, max_tokens=max_tokens)
+                if raw2 and not any(e in raw2.lower() for e in _ERROR_STRINGS):
+                    cleaned = self._clean_response(raw2, user_message=user_message, emotion=emotion, turn_count=turn_count)
+
+        return cleaned
 
     def _generate_local(self, formatted_prompt, max_tokens=512):
         """Generate response using local GGUF model."""
@@ -193,6 +234,15 @@ class LLMResponder:
             echo=False
         )
         raw = output["choices"][0]["text"]
+
+        # Strip citation markers like "1 .", "[1]", "(1)", "¹"
+        raw = re.sub(r'\s*[\(\[]\d+[\)\]]\s*|\s+\d+\s*\.(?!\w)|\s*[¹²³⁴⁵⁶⁷⁸⁹]', '', raw).strip()
+
+        # Strip from the first numbered list item onward (any number)
+        raw = re.sub(r'\s*\d+[.)]\s+.*', '', raw, flags=re.DOTALL).strip()
+
+        # Strip colon-labeled soft list items e.g. "Self-care - ..." or "Reach out for support: ..."
+        raw = re.sub(r'\b[A-Z][^.!?]{0,40}[-:]\s+[A-Z].*', '', raw, flags=re.DOTALL).strip()
 
         # Safety net: repetition loop detection.
         # Use 6-word window and require 4+ repeats to avoid false positives
@@ -230,7 +280,14 @@ class LLMResponder:
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                return data.get("response", "")
+                raw = data.get("response", "")
+                # Strip citation markers like "1 .", "[1]", "(1)", "¹"
+                raw = re.sub(r'\s*[\(\[]\d+[\)\]]\s*|\s+\d+\s*\.(?!\w)|\s*[¹²³⁴⁵⁶⁷⁸⁹]', '', raw).strip()
+                # Strip from the first numbered list item onward (any number)
+                raw = re.sub(r'\s*\d+[.)]\s+.*', '', raw, flags=re.DOTALL).strip()
+                # Strip colon-labeled soft list items
+                raw = re.sub(r'\b[A-Z][^.!?]{0,40}[-:]\s+[A-Z].*', '', raw, flags=re.DOTALL).strip()
+                return raw
         except urllib.error.HTTPError as e:
             log.error("HTTP error %s: %s", e.code, e.read().decode("utf-8", errors="replace"))
             return f"Server error ({e.code}). Please try again."

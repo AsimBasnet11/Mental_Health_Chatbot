@@ -296,6 +296,14 @@ def chat(body: ChatIn, current_user=Depends(get_optional_user)):
     user_message = body.message.strip()
     session_id = body.session_id
     user_id = current_user["user_id"] if current_user else None
+    # Always reload history from DB to ensure latest state
+    if user_id:
+        # Remove from in-memory cache to force reload
+        cache_key = f"{user_id}:{session_id}"
+        sessions.pop(cache_key, None)
+    else:
+        cache_key = session_id
+        sessions.pop(cache_key, None)
     history = get_session(session_id, user_id)
     result = process_user_input(user_message, history)
 

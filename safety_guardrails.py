@@ -82,8 +82,16 @@ _CLICHE_RE = re.compile(
     r"|doesn't define your worth"
     r"|range of emotions"
     r"|one suggestion (i have )?(is|would be)"
+    r"|one (thing|suggestion|tip|step) (i would|i'd) (suggest|recommend)"
+    r"|here are (some |a few )?(steps|ways|things|areas|tips)"
     r")\b[^.!?]*[.!?]",
     re.IGNORECASE
+)
+
+# Strips colon-labeled soft list sentences: "Reach out for support: Consider..."
+# or "Self-care - Take some time..."
+_SOFT_LIST_RE = re.compile(
+    r'[^.!?]*\b[A-Za-z][^.!?]{0,40}[-:]\s+[A-Z][^.!?]*[.!?]?',
 )
 
 _HELPLINE_SENTENCE_RE = re.compile(
@@ -140,6 +148,7 @@ def apply_safety_guardrails(response, category_score=1.0,
 
     # Rule 0c — Strip cliche/clinical sentences (narrow)
     cleaned = _CLICHE_RE.sub('', response).strip()
+    cleaned = _SOFT_LIST_RE.sub('', cleaned).strip()
     if len(cleaned.split()) >= 8:
         response = cleaned
     response = re.sub(r'  +', ' ', response).strip()
@@ -188,8 +197,8 @@ def apply_safety_guardrails(response, category_score=1.0,
         s for s in sentences
         if not re.search(r'(:\s*\d+\.?\s*$|^\d+\.\s*$|here are (some|a few)[^.!?]*:\s*$)', s.strip(), re.IGNORECASE)
     ]
-    if len(sentences) > 4:
-        sentences = sentences[:4]
+    if len(sentences) > 3:
+        sentences = sentences[:3]
     response = ' '.join(sentences)
     response = _ensure_complete_sentence(response)
 

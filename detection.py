@@ -1,3 +1,59 @@
+KEYWORD_MAP = {
+    "Depression": [
+        r"\bdepress(ed|ion|ing)?\b", r"\bsad(ness|ly)?\b", r"\bhopeless(ness)?\b", r"\blonely|loneliness\b", r"\bworthless(ness)?\b",
+        r"\bdown\b", r"\bempty\b", r"\btearful\b", r"\bunhappy\b", r"\bno motivation\b", r"\bloss of interest\b", r"\bself-hate\b",
+        r"\bguilt(y)?\b", r"\bhelpless(ness)?\b", r"\btrouble sleeping\b", r"\bcan'?t concentrate\b", r"\bexhaust(ed|ion)\b"
+    ],
+    "Anxiety": [
+        r"\banxious|anxiety\b", r"\bnervous(ness)?\b", r"\bworry|worried|worrying\b", r"\bpanic(ked|king)?\b",
+        r"\brestless(ness)?\b", r"\btense|tension\b", r"\bapprehensive\b", r"\buneasy\b", r"\bfear(ful|ing)?\b",
+        r"\bracing thoughts\b", r"\bcan'?t relax\b", r"\bheart racing\b", r"\bshort of breath\b", r"\bsweating\b"
+    ],
+    "Bipolar": [
+        r"\bbipolar\b", r"\bmanic|mania\b", r"\bhighs? and lows?\b", r"\bimpulsive\b", r"\brapid cycling\b",
+        r"\bgrandiose\b", r"\bhyperactive\b", r"\bpressured speech\b", r"\bracing thoughts\b", r"\bdecreased need for sleep\b"
+    ],
+    "Personality Disorder": [
+        r"\bpersonality disorder\b", r"\bborderline\b", r"\bantisocial\b", r"\bparanoid\b", r"\bobsessive-compulsive\b",
+        r"\bavoidant\b", r"\bdependent\b", r"\bschizoid\b", r"\bschizotypal\b", r"\bhistrionic\b", r"\bnarcissistic\b"
+    ],
+    "Suicidal": [
+        r"\bsuicid(al|e)\b", r"\bend my life\b", r"\bkill myself\b", r"\bwant to die\b", r"\bno reason to live\b",
+        r"\bcan'?t go on\b", r"\bnot worth living\b", r"\bgive up\b", r"\bbetter off dead\b", r"\bself-harm\b"
+    ],
+}
+
+# Phrases to ignore for 'Normal' (do not count as normal)
+_IGNORE_NORMAL = [
+    r"\bi am feeling\b", r"\bi feel\b", r"\bi am\b", r"\bfeeling\b", r"\bnow\b"
+]
+
+def keyword_state_count(text):
+    """Scan text for mental health keywords, count each state, return the state with the highest count (average if multiple)."""
+    text = text.lower()
+    counts = {k: 0 for k in KEYWORD_MAP}
+    total = 0
+    for state, patterns in KEYWORD_MAP.items():
+        for pat in patterns:
+            matches = re.findall(pat, text)
+            if matches:
+                counts[state] += len(matches)
+                total += len(matches)
+    # Remove ignored phrases for 'Normal'
+    for pat in _IGNORE_NORMAL:
+        text = re.sub(pat, "", text)
+    # If no keywords found, treat as 'Normal'
+    if total == 0:
+        return "Normal", 1.0
+    # Find state with max count (average if tie)
+    max_count = max(counts.values())
+    if max_count == 0:
+        return "Normal", 1.0
+    winners = [k for k, v in counts.items() if v == max_count]
+    # If tie, pick first alphabetically
+    winner = sorted(winners)[0]
+    avg = max_count / sum(counts.values()) if sum(counts.values()) > 0 else 1.0
+    return winner, avg
 """
 Detection Module
 Loads the emotion (GoEmotions) and mental health (Sentimental-analysis) models
@@ -260,10 +316,24 @@ def classify_mental_health(text):
     if not cleaned:
         return ("Normal", 0.5)
 
+    # First, try keyword-based detection
+    keyword_label, keyword_avg = keyword_state_count(cleaned)
+    if keyword_label != "Normal":
+        return (keyword_label, keyword_avg)
+    # Otherwise, use model-based detection
     expanded = _expand_short_text(cleaned)
     probs = _infer_best_chunk(expanded, tokenizer, model)
     probs = _apply_suicidal_safety_net(probs, cleaned)
     top_idx = int(np.argmax(probs))
+    # Depression/Normal resolver logic
+    if SENTIMENT_LABELS[top_idx] == "Normal":
+        depression_idx = SENTIMENT_LABELS.index("Depression")
+        depression_score = float(probs[depression_idx])
+        normal_score = float(probs[top_idx])
+        # If Depression is second highest and close to Normal, pick Depression
+        sorted_indices = np.argsort(probs)[::-1]
+        if sorted_indices[1] == depression_idx and (normal_score - depression_score) < 0.20 and depression_score > 0.15:
+            return ("Depression", depression_score)
     return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]))
 
 
@@ -278,12 +348,29 @@ def classify_mental_health_with_scores(text):
     if not cleaned:
         return ("Normal", 0.5, {})
 
+    # First, try keyword-based detection
+    keyword_label, keyword_avg = keyword_state_count(cleaned)
+    if keyword_label != "Normal":
+        all_scores = {k: 1.0 if k == keyword_label else 0.0 for k in SENTIMENT_LABELS}
+        return (keyword_label, keyword_avg, all_scores)
+    # Otherwise, use model-based detection
     expanded = _expand_short_text(cleaned)
     probs = _infer_best_chunk(expanded, tokenizer, model)
     probs = _apply_suicidal_safety_net(probs, cleaned)
     top_idx = int(np.argmax(probs))
+    depression_idx = SENTIMENT_LABELS.index("Depression")
+    depression_score = float(probs[depression_idx])
+    normal_score = float(probs[SENTIMENT_LABELS.index("Normal")])
+    sorted_indices = np.argsort(probs)[::-1]
+    label = SENTIMENT_LABELS[top_idx]
+    conf = float(probs[top_idx])
+    # Depression/Normal resolver logic
+    if label == "Normal":
+        if sorted_indices[1] == depression_idx and (normal_score - depression_score) < 0.20 and depression_score > 0.15:
+            label = "Depression"
+            conf = depression_score
     all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(probs)}
-    return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]), all_scores)
+    return (label, conf, all_scores)
 
 
 def analyze_full(text):
