@@ -1,4 +1,19 @@
+
 # Mental Health AI Chatbot — Aria
+
+## Overview
+
+Aria is an AI-powered mental health chatbot designed to provide real-time emotional support, mental health analysis, and counseling responses. It leverages advanced NLP models for emotion detection, sentiment analysis, and LLM-based conversational guidance. The system is intended for users seeking a supportive, private, and interactive mental health companion.
+
+## Features
+
+- Real-time emotion and mental health analysis (GoEmotions, RoBERTa)
+- LLM-powered counseling responses (Llama 3)
+- Voice input with ASR (Faster Whisper, Google Colab)
+- Session summaries and chat history
+- Modern React frontend with live sentiment graph
+- Easy deployment (Colab or local)
+
 
 ## Project Structure
 
@@ -55,7 +70,44 @@ finalized model/
 └── public/                     # Static assets
 ```
 
+
 ## Quick Start
+## Testing
+
+To run backend Python tests (add your own in the future):
+
+```bash
+pytest
+```
+
+To run frontend tests (if available):
+
+```bash
+npm test
+```
+
+## Contribution Guidelines
+
+Contributions are welcome! Please open issues for bugs or feature requests. To contribute code:
+
+1. Fork the repository
+2. Create a new branch
+3. Make your changes with clear commit messages
+4. Submit a pull request
+
+## Security & Privacy
+
+- All user data is processed in-memory and not stored unless explicitly enabled.
+- Never hardcode secrets; use environment variables for sensitive information.
+- Review third-party dependencies for vulnerabilities regularly.
+
+## Screenshots
+
+Add screenshots or a GIF of the UI here for a quick visual overview.
+
+## Changelog
+
+See CHANGELOG.md for recent updates (if available).
 
 ### 1. Install Python dependencies
 ```bash
@@ -79,10 +131,14 @@ The 4.58 GB LLM model is best run on Google Colab with a free T4 GPU.
 6. Copy the public ngrok URL from Cell 5 (e.g. `https://xyz.ngrok-free.app`)
 7. Set the environment variable before starting the backend:
 
-**PowerShell:**
-```powershell
-$env:LLM_API_URL = "https://xyz.ngrok-free.app"
-```
+> **Important:** Use the following value for the LLM API URL:
+>
+> ```powershell
+> $env:LLM_API_URL="https://minh-suberect-preintelligently.ngrok-free.dev"
+> ```
+>
+> Replace this only if you have your own ngrok URL.
+
 
 **Linux / macOS / Colab:**
 ```bash
@@ -116,41 +172,14 @@ Open the URL shown by Vite (usually **http://localhost:5173**).
 | `/api/summary` | POST | End session, get summary |
 | `/api/history` | GET | Full chat history |
 
-## ASR Server (Google Colab)
 
-The Voice Page uses a **Faster Whisper ASR** streaming server that runs on **Google Colab** with GPU acceleration.
+## ASR & LLM Servers (Google Colab)
 
-### Setup
+- For voice input, run `asr/ASR_Colab_Server.ipynb` in Colab (GPU), upload required files, and use the ngrok URL in the app.
+- For LLM, run `colab/LLM_Colab_Server.ipynb` in Colab (GPU), upload the model, and set the LLM_API_URL as above.
 
-1. Open `asr/ASR_Colab_Server.ipynb` in Google Colab
-2. Set runtime to **GPU** (Runtime → Change runtime type → T4 GPU)
-3. Upload the 3 files from `asr/` folder:
-   - `server_streaming_optimized.py`
-   - `frequency_dictionary_en_82_765.txt`
-   - `frequency_bigramdictionary_en_243_342.txt`
-4. Run all cells in order
-5. Copy the `wss://...ngrok.../ws/asr` URL from Cell 6
-6. Paste it into the Voice Page URL input field in the React app
-7. Click **Connect Server** and start speaking
+**Note:** ngrok URLs change each session. Update the app with the new URL as needed.
 
-> **Note:** The ngrok URL changes each time you restart the Colab notebook. Paste the new URL each session.
+---
 
-## LLM Server (Google Colab)
-
-The counselor LLM (Counselor_Llama3_Q4.gguf, 4.58 GB) runs on **Google Colab** to avoid the 8+ GB RAM needed locally.
-
-### Setup
-
-1. Open `colab/LLM_Colab_Server.ipynb` in Google Colab
-2. Set runtime to **GPU** (Runtime → Change runtime type → T4 GPU)
-3. Upload `Counselor_Llama3_Q4.gguf` when prompted (Cell 2)
-4. Paste your ngrok auth token in Cell 3
-5. Run all cells — Cell 4 starts a Flask API and Cell 5 prints the public URL
-6. Set the `LLM_API_URL` environment variable to that URL before running `python app.py`
-
-### API
-
-| Endpoint | Method | Body | Response |
-|---|---|---|---|
-| `/generate` | POST | `{"prompt": "...", "max_tokens": 300, "temperature": 0.7}` | `{"response": "..."}` |
-| `/health` | GET | — | `{"status": "ok"}` |
+**Contributions welcome!** For questions or issues, open an issue on GitHub.
