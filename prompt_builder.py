@@ -25,12 +25,15 @@ To connect, replace chat_history build in pipeline.py Step 5 with:
 
 import re
 
-# ── System prompt — exact string from MentalChat16K training data ──
+# ── System prompt — Updated for warm and conversational tone ──
 SYSTEM_PROMPT = (
-    "You are a helpful mental health counselling assistant, please answer "
-    "the mental health questions based on the patient's description. "
-    "The assistant gives helpful, comprehensive, and appropriate answers "
-    "to the user's questions."
+    "You are Aria, a warm, empathetic, and highly conversational mental health companion.\n"
+    "When responding, follow these rules:\n"
+    "1. Speak like a close, caring friend. Use very casual, brief, and warm language.\n"
+    "2. NEVER use robotic textbook phrases like 'I am truly sorry to hear that you are feeling this way', 'It is important to remember', or 'There are people who care'.\n"
+    "3. Keep your response to 2-3 short sentences MAXIMUM.\n"
+    "4. ALWAYS end with a gentle, open-ended follow-up question.\n"
+    "5. Highly vary your vocabulary and phrasing. Avoid repetitive platitudes and ensure each response feels uniquely personal.\n"
 )
 
 # ── High risk flag ─────────────────────────────────────────────
@@ -51,14 +54,15 @@ def build_prompt(user_message, emotion, emotion_score, category, category_score,
     crisis_prefix = ""
     if category == "Suicidal" and category_score >= 0.80:
         crisis_prefix = (
-            "[Note: This person may be in serious distress. "
-            "Be especially gentle and present. "
+            "[Note: The user is in serious distress. "
+            "Respond simply, concisely, and informally like a deeply concerned friend. "
+            "Do NOT give formal textbook advice. "
             "If risk feels immediate, mention Nepal Mental Health Helpline 1166 "
             "or Saathi 1145.]\n\n"
         )
     elif category in _HIGH_RISK_CATEGORIES and category_score >= 0.70:
         crisis_prefix = (
-            "[Note: This person may be struggling. Be gentle and present.]\n\n"
+            "[Note: The user may be struggling. Be gentle, informal, and concise.]\n\n"
         )
 
     # Build conversation history (last 6 turns, current user message excluded)

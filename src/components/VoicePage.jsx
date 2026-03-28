@@ -780,7 +780,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
             >
               <div 
-                className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line
+                className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line text-justify
                   ${msg.isUser
                     ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
                     : 'bg-[#231550]/75 border border-purple-500/20 text-purple-100 animate-slideUp'}`}

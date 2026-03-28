@@ -84,6 +84,10 @@ _CLICHE_RE = re.compile(
     r"|one suggestion (i have )?(is|would be)"
     r"|one (thing|suggestion|tip|step) (i would|i'd) (suggest|recommend)"
     r"|here are (some |a few )?(steps|ways|things|areas|tips)"
+    r"|i('m| am) truly sorry to hear that"
+    r"|i'm so sorry to hear that"
+    r"|it('s| is) understandable that"
+    r"|there are people who care about you"
     r")\b[^.!?]*[.!?]",
     re.IGNORECASE
 )
@@ -187,8 +191,8 @@ def apply_safety_guardrails(response, category_score=1.0,
         if not response.endswith("?"):
             response += " Can you share more about what you're going through?"
 
-    # Rule 5 — Cap at 4 sentences, no word limit
-    # Model tends to loop and repeat — 4 sentences keeps it focused
+    # Rule 5 — Cap at 4 sentences to allow room for the follow-up question
+    # Model tends to loop and repeat — keeps it focused
     sentences = re.split(r'(?<=[.!?])\s+', response.strip())
     sentences = [s for s in sentences if s.strip()]
     # Drop any sentence that is just a numbered list opener cut off mid-way
@@ -197,8 +201,12 @@ def apply_safety_guardrails(response, category_score=1.0,
         s for s in sentences
         if not re.search(r'(:\s*\d+\.?\s*$|^\d+\.\s*$|here are (some|a few)[^.!?]*:\s*$)', s.strip(), re.IGNORECASE)
     ]
-    if len(sentences) > 3:
+    if len(sentences) > 4:
+        # If we truncate, preserve the follow-up question which is always the last sentence
+        last_sentence = sentences[-1] if sentences[-1].endswith("?") else ""
         sentences = sentences[:3]
+        if last_sentence and last_sentence not in sentences:
+            sentences.append(last_sentence)
     response = ' '.join(sentences)
     response = _ensure_complete_sentence(response)
 

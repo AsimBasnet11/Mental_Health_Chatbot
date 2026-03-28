@@ -84,11 +84,18 @@ def process_user_input(user_message, conversation_history):
         user_message, emotion, emotion_score, category, category_score
     )
 
-    # Step 5: Build chat history with MentalChat16K system prompt prepended.
-    # Matches the exact instruction the counselor model was trained on.
-    from prompt_builder import SYSTEM_PROMPT
+    # Step 5: Build chat history using prompt_builder
+    from prompt_builder import build_prompt
     history_for_prompt = conversation_history.get_safe_history()
-    chat_history = [{"role": "system", "content": SYSTEM_PROMPT}] + history_for_prompt[-6:]
+    built_prompt = build_prompt(
+        user_message=user_message,
+        emotion=emotion,
+        emotion_score=emotion_score,
+        category=category,
+        category_score=category_score,
+        conversation_history=history_for_prompt
+    )
+    chat_history = [{"role": "system", "content": built_prompt["system"]}] + built_prompt["messages"]
 
     # Step 6: max_tokens — counselor model needs room for full responses
     is_list_req = False   # MentalChat16K model outputs prose, not lists
@@ -110,15 +117,15 @@ def process_user_input(user_message, conversation_history):
     # Multi-response re-ranking only after 3+ turns and not for lists
     if _turn_count >= 3 and not is_list_req:
         candidates = [
-            llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, category=category, turn_count=_turn_count),
-            llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, category=category, turn_count=_turn_count),
+            llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, emotion_score=emotion_score, category=category, turn_count=_turn_count),
+            llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, emotion_score=emotion_score, category=category, turn_count=_turn_count),
         ]
         scores = [_diversity_score(c, _recent_aria) for c in candidates]
         best_idx = scores.index(max(scores))
         response = candidates[best_idx]
         _log.debug("Multi-response: scores=%s selected=%d", scores, best_idx)
     else:
-        response = llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, category=category, turn_count=_turn_count)
+        response = llm.generate_response(chat_history, max_tokens=max_tok, emotion=emotion, emotion_score=emotion_score, category=category, turn_count=_turn_count)
 
     # Step 8: Safety Guardrails
     num_match = _re.search(

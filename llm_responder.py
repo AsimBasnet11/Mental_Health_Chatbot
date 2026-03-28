@@ -76,14 +76,23 @@ class LLMResponder:
         prompt += "<|assistant|>\n"
         return prompt
 
-    def _get_followup_question(self, emotion=None):
-        """Pick a relevant followup question based on emotion only.
-        Returns None if no emotion detected — no question appended in that case.
+    _FALLBACK_RESPONSES = [
+        "I hear you. Take all the time you need.",
+        "That sounds really tough. I'm with you.",
+        "I'm here — you don't have to go through this alone.",
+        "It makes sense that you'd feel this way.",
+        "Thanks for sharing that with me.",
+    ]
+
+    def _get_followup_question(self, emotion=None, emotion_score=0.0):
+        """Pick a relevant followup question based on emotion.
+        Only uses the emotion bucket when confidence is reasonably high (>= 0.55).
+        Falls back to 'default' otherwise to avoid mismatched questions.
         """
         import random
-        if not emotion:
-            return None
-        key = emotion.lower() if emotion.lower() in FOLLOWUP_QUESTIONS else "default"
+        key = "default"
+        if emotion and emotion.lower() in FOLLOWUP_QUESTIONS and emotion_score >= 0.55:
+            key = emotion.lower()
         return random.choice(FOLLOWUP_QUESTIONS[key])
 
     def _clean_response(self, text, user_message=None, emotion=None, turn_count=0):
@@ -94,15 +103,16 @@ class LLMResponder:
         - No list flattening — model outputs prose
         - Deduplicates repeated sentences
         """
-        import re
-        text = text.strip()
+        # If the model starts hallucinating the next turn using template tokens,
+        # cut the response off entirely right there!
+        import re as _re
+        text = _re.split(r'<\|user\|>|<\|system\|>', text, maxsplit=1)[0].strip()
 
-        # Strip prompt token leakage
-        text = re.sub(r'<\|user\|>|<\|assistant\|>|<\|system\|>', '', text)
+        # Remove any stray <|assistant|> tokens that might have been echoed
+        text = _re.sub(r'<\|assistant\|>', '', text).strip()
 
         # Remove extra turns if model continued generating
         # Split on any of these markers — take only what comes before
-        import re as _re
         text = _re.split(
             r'\n(?:User|Human|Patient|Counselor)\s*:',
             text, maxsplit=1
@@ -129,38 +139,49 @@ class LLMResponder:
         sentences = re.split(r'(?<=[.!?])\s+', text)
         seen = set()
         filtered = []
-        for s in sentences:
-            lowered = s.strip().lower()
-            if not lowered:
+        for i, s in enumerate(sentences):
+            s_stripped = s.strip()
+            if not s_stripped:
                 continue
+                
+            # Drop incomplete final sentence if text was abruptly cut off (e.g., token limit)
+            if i == len(sentences) - 1 and not s_stripped[-1] in ('.', '!', '?'):
+                continue
+                
+            lowered = s_stripped.lower()
             if lowered in seen:
                 continue
-            if _HALLUCINATION_PATTERNS.search(s):
+            if _HALLUCINATION_PATTERNS.search(s_stripped):
                 continue
             # Skip sentences that are just a numbered list opener cut off mid-way
             # e.g. "Here are some suggestions: 1." or ending with a bare number
-            if re.search(r'(:\s*\d+\.?\s*$|^\d+\.\s*$)', s.strip()):
+            if _re.search(r'(:\s*\d+\.?\s*$|^\d+\.\s*$)', s_stripped):
                 continue
-            filtered.append(s.strip())
+            filtered.append(s_stripped)
             seen.add(lowered)
 
         cleaned = ' '.join(filtered) if filtered else text
+        cleaned = cleaned.strip()
 
-        # Sentence 5: append followup question when emotion detected
-        sents = re.split(r'(?<=[.!?])\s+', cleaned.strip())
-        sents = [s for s in sents if s.strip()]
-        if emotion and len(sents) >= 4:
-            followup = self._get_followup_question(emotion=emotion)
-            if followup and not cleaned.rstrip().endswith("?"):
+        # Fallback if the model output was entirely empty or dropped
+        if not cleaned:
+            import random
+            cleaned = random.choice(self._FALLBACK_RESPONSES)
+
+        # Ensure we always append a followup question if the model forgot to end with one
+        if not cleaned.rstrip().endswith("?"):
+            followup = self._get_followup_question(emotion=emotion, emotion_score=getattr(self, '_last_emotion_score', 0.0))
+            if followup:
                 cleaned = cleaned.rstrip() + ' ' + followup
 
         return cleaned
 
-    def generate_response(self, messages, max_tokens=512, emotion=None, category=None, turn_count=0):
+    def generate_response(self, messages, max_tokens=512, emotion=None, emotion_score=0.0, category=None, turn_count=0):
         """
         Generate response. Accepts a list of messages (chat history), builds a chat-style prompt.
         emotion + turn_count used for followup question on odd turns only.
         """
+        self._last_emotion_score = emotion_score
         _ERROR_STRINGS = (
             "something went wrong",
             "server error",
@@ -199,10 +220,12 @@ class LLMResponder:
             ) / max(len(set(cleaned.lower().split())), 1)
             if overlap > 0.6:
                 # Re-generate with an explicit nudge to respond differently
-                nudged = messages + [{
-                    "role": "system",
-                    "content": "Your previous response was very similar to what you just said. Please respond differently — use different words, a different angle, or ask something new."
-                }]
+                import copy
+                nudged = copy.deepcopy(messages)
+                for m in reversed(nudged):
+                    if m.get("role") == "user":
+                        m["content"] += "\n\n[Note: Your previous response was very repetitive. Respond differently using new words or a new angle.]"
+                        break
                 nudged_prompt = self._build_llama3_prompt(nudged)
                 if self.remote_url:
                     raw2 = self._generate_remote(nudged_prompt, max_tokens=max_tokens)
@@ -218,10 +241,10 @@ class LLMResponder:
         output = self.llm(
             formatted_prompt,
             max_tokens=max_tokens,
-            temperature=0.35,
-            top_p=0.9,
-            top_k=45,
-            repeat_penalty=1.3,
+            temperature=0.85,
+            top_p=0.95,
+            top_k=50,
+            repeat_penalty=1.1,
             presence_penalty=0.1,
             frequency_penalty=0.05,
             stop=[
@@ -262,9 +285,9 @@ class LLMResponder:
         payload = json.dumps({
             "prompt": formatted_prompt,
             "max_tokens": max_tokens,
-            "temperature": 0.35,
-            "top_k": 45,
-            "repeat_penalty": 1.3,
+            "temperature": 0.85,
+            "top_k": 50,
+            "repeat_penalty": 1.1,
         }).encode("utf-8")
 
         req = urllib.request.Request(
