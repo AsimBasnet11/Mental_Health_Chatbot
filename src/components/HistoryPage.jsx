@@ -110,16 +110,16 @@ const HistoryPage = ({
   };
 
   return (
-    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#f0f9f4] text-[#2d3436] overflow-hidden">
       <Sidebar onHomeClick={onHomeClick} onMentalStateClick={onMentalStateClick}
         onHistoryClick={onHistoryClick} onFAQsClick={onFAQsClick} onSummaryClick={onSummaryClick}
         currentPage="history" user={user} onLogout={onLogout} onNewChat={onNewChat} />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#f0f9f4] via-[#fef9f5] to-[#f0f7ff]">
         {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div key={i} className="absolute bg-white rounded-full opacity-40 animate-pulse"
+            <div key={i} className="absolute bg-[#a5d6a7]/40 rounded-full animate-pulse"
               style={{ width: `${Math.random()*2+1}px`, height: `${Math.random()*2+1}px`,
                 top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
                 animationDuration: `${Math.random()*3+2}s` }} />
@@ -127,25 +127,25 @@ const HistoryPage = ({
         </div>
 
         {/* Header */}
-        <div className="relative z-10 p-6 border-b border-purple-500/20">
+        <div className="relative z-10 p-6 border-b border-[#a5d6a7]/20 bg-white/40 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-extrabold text-slate-800">
                 Conversations
               </h1>
-              <p className="text-purple-300/60 mt-1">
+              <p className="text-slate-500 mt-1 font-medium">
                 {conversations.length > 0 ? `${conversations.length} conversation${conversations.length !== 1 ? 's' : ''}` : 'No conversations yet'}
               </p>
             </div>
             <div className="flex gap-3">
               {conversations.length > 0 && (
                 <button onClick={() => setShowClearConfirm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 rounded-full transition-all text-red-400 hover:text-red-300">
+                  className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full transition-all text-rose-600 font-bold shadow-sm">
                   <FaTrash className="text-sm" /> Clear All
                 </button>
               )}
               <button onClick={onBack}
-                className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all flex items-center gap-2">
+                className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-full transition-all flex items-center gap-2 shadow-sm font-bold">
                 <FaArrowLeft /> Back
               </button>
             </div>
@@ -154,15 +154,15 @@ const HistoryPage = ({
 
         {/* Clear Confirmation Modal */}
         {showClearConfirm && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#1e1240] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
-              <h3 className="text-xl font-bold text-white mb-3">Clear All Conversations?</h3>
-              <p className="text-purple-300/80 mb-6">This will permanently delete all conversations and messages. This cannot be undone.</p>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+              <h3 className="text-xl font-bold text-slate-800 mb-3">Clear All Conversations?</h3>
+              <p className="text-slate-500 mb-6 font-medium">This will permanently delete all conversations and messages. This cannot be undone.</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-full transition-all text-white">Cancel</button>
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-all text-slate-700 font-bold">Cancel</button>
                 <button onClick={clearAll}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-full transition-all text-white font-semibold">Clear All</button>
+                  className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-full transition-all text-white font-bold shadow-lg shadow-rose-500/20">Clear All</button>
               </div>
             </div>
           </div>
@@ -170,15 +170,15 @@ const HistoryPage = ({
 
         {/* Delete single confirmation */}
         {deleteId && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#1e1240] border border-purple-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
-              <h3 className="text-xl font-bold text-white mb-3">Delete Conversation?</h3>
-              <p className="text-purple-300/80 mb-6">This conversation and all its messages will be permanently deleted.</p>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+              <h3 className="text-xl font-bold text-slate-800 mb-3">Delete Conversation?</h3>
+              <p className="text-slate-500 mb-6 font-medium">This conversation and all its messages will be permanently deleted.</p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteId(null)}
-                  className="flex-1 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-full transition-all text-white">Cancel</button>
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-all text-slate-700 font-bold">Cancel</button>
                 <button onClick={() => deleteConversation(deleteId)}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-full transition-all text-white font-semibold">Delete</button>
+                  className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-full transition-all text-white font-bold shadow-lg shadow-rose-500/20">Delete</button>
               </div>
             </div>
           </div>
@@ -188,60 +188,60 @@ const HistoryPage = ({
         <div className="flex-1 overflow-hidden relative z-10 flex">
 
           {/* Conversation list (left panel) */}
-          <div className={`${selectedConv ? 'w-1/3 border-r border-purple-500/20' : 'w-full'} overflow-y-auto p-6 transition-all duration-300`}>
+          <div className={`${selectedConv ? 'w-1/3 border-r border-[#a5d6a7]/20' : 'w-full'} overflow-y-auto p-6 transition-all duration-300`}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-purple-300/60 animate-pulse">Loading conversations...</div>
+                <div className="text-slate-400 animate-pulse font-medium">Loading conversations...</div>
               </div>
             ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-24 h-24 bg-purple-600/20 rounded-full flex items-center justify-center mb-4">
-                  <MessageSquare className="w-12 h-12 text-purple-400" />
+                <div className="w-24 h-24 bg-teal-500/10 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                  <MessageSquare className="w-12 h-12 text-teal-600" />
                 </div>
-                <h2 className="text-2xl font-semibold text-purple-300 mb-2">No Conversations Yet</h2>
-                <p className="text-purple-300/60 max-w-md">Start chatting to see your conversations here. You can continue any conversation later!</p>
+                <h2 className="text-2xl font-bold text-slate-800 mb-3">No Conversations Yet</h2>
+                <p className="text-slate-500 max-w-md font-medium leading-relaxed">Start chatting to see your conversations here. You can continue any conversation later!</p>
                 <button onClick={onHomeClick}
-                  className="mt-6 px-6 py-3 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/30 rounded-full transition-all text-white">
+                  className="mt-8 px-8 py-3 bg-teal-600 text-white hover:bg-teal-700 rounded-full transition-all font-bold shadow-lg shadow-teal-500/20">
                   Start a Conversation
                 </button>
               </div>
             ) : (
-              <div className="space-y-3 max-w-3xl mx-auto">
+              <div className="space-y-4 max-w-4xl mx-auto">
                 {conversations.map((conv, index) => (
                   <div key={conv.session_id}
                     onClick={() => loadMessages(conv.session_id)}
-                    className={`bg-[#231550]/80 border rounded-2xl p-4 backdrop-blur-md cursor-pointer transition-all animate-fadeIn hover:bg-[#231550]/85
-                      ${selectedConv?.session_id === conv.session_id ? 'border-purple-400/60 bg-[#231550]/90' : 'border-purple-500/20 hover:border-purple-500/40'}`}
+                    className={`bg-white/70 border rounded-2xl p-5 backdrop-blur-md cursor-pointer transition-all animate-fadeIn shadow-sm hover:shadow-md
+                      ${selectedConv?.session_id === conv.session_id ? 'border-teal-400 bg-white/90 ring-4 ring-teal-500/5' : 'border-[#a5d6a7]/30 hover:border-teal-400/50'}`}
                     style={{ animationDelay: `${index * 40}ms` }}>
 
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-white font-medium text-sm leading-tight flex-1 mr-3 line-clamp-2">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="text-slate-800 font-bold text-sm leading-tight flex-1 mr-4 line-clamp-2">
                         {conv.title || 'Untitled conversation'}
                       </h3>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-purple-300/50 text-xs">{formatTime(conv.updated_at)}</span>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{formatTime(conv.updated_at)}</span>
                         <button onClick={(e) => { e.stopPropagation(); setDeleteId(conv.session_id); }}
-                          className="p-1 hover:bg-red-500/20 rounded-full transition-all text-purple-400/40 hover:text-red-400">
+                          className="p-1.5 hover:bg-rose-50 rounded-full transition-all text-slate-300 hover:text-rose-500">
                           <FaTrash className="text-xs" />
                         </button>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-purple-300/50 text-xs">
+                      <div className="flex items-center gap-4 text-slate-500 text-[11px] font-bold">
                         {conv.conv_type === 'voice' ? (
-                          <span className="flex items-center gap-1 text-pink-400/70"><FaMicrophone /> Voice</span>
+                          <span className="flex items-center gap-1.5 text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md"><FaMicrophone className="text-[10px]" /> Voice</span>
                         ) : (
-                          <span className="flex items-center gap-1"><FaComments /> Chat</span>
+                          <span className="flex items-center gap-1.5 text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md"><FaComments className="text-[10px]" /> Chat</span>
                         )}
-                        <span className="flex items-center gap-1">{conv.message_count} messages</span>
-                        <span className="flex items-center gap-1"><FaClock /> {formatTime(conv.created_at)}</span>
+                        <span className="flex items-center gap-1.5"><FaComments className="text-teal-500/50" /> {conv.message_count} messages</span>
+                        <span className="flex items-center gap-1.5"><FaClock className="text-orange-400/50" /> {formatTime(conv.created_at)}</span>
                       </div>
                     </div>
 
                     {conv.last_message && (
-                      <p className="text-purple-300/40 text-xs mt-2 line-clamp-1 italic">
-                        {conv.last_role === 'user' ? 'You: ' : 'Bot: '}{conv.last_message}
+                      <p className="text-slate-400 text-xs mt-3 line-clamp-1 italic font-medium">
+                        {conv.last_role === 'user' ? 'You: ' : 'Aria: '}{conv.last_message}
                       </p>
                     )}
                   </div>
@@ -252,34 +252,34 @@ const HistoryPage = ({
 
           {/* Message detail panel (right) */}
           {selectedConv && (
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden bg-white/40 backdrop-blur-md">
               {/* Detail header */}
-              <div className="p-4 border-b border-purple-500/20 flex items-center justify-between">
+              <div className="p-5 border-b border-[#a5d6a7]/20 flex items-center justify-between bg-white/40">
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-semibold text-white truncate">{selectedConv.title}</h2>
-                  <p className="text-purple-300/50 text-xs">{selectedMessages.length} messages</p>
+                  <h2 className="text-lg font-bold text-slate-800 truncate">{selectedConv.title}</h2>
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-0.5">{selectedMessages.length} messages</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { setSelectedConv(null); setSelectedMessages([]); }}
-                    className="p-2 hover:bg-purple-600/20 rounded-full transition-all text-purple-300/60 hover:text-white text-sm">
+                    className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600 text-lg">
                     ✕
                   </button>
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(109,40,217,0.4) transparent' }}>
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-teal-200/40 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,150,136,0.2) transparent' }}>
                 {loadingMessages ? (
                   <div className="flex items-center justify-center h-full">
-                    <div className="text-purple-300/60 animate-pulse">Loading messages...</div>
+                    <div className="text-slate-400 animate-pulse font-medium">Loading messages...</div>
                   </div>
                 ) : (
                   selectedMessages.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`inline-block px-4 py-2 rounded-2xl max-w-[75%] break-words whitespace-pre-line text-sm
+                      <div className={`inline-block px-5 py-3 rounded-2xl max-w-[80%] break-words whitespace-pre-line text-sm font-medium shadow-sm transition-all
                         ${msg.role === 'user'
-                          ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                          : 'bg-[#231550]/80 border border-purple-500/20 text-purple-100'}`}>
+                          ? 'bg-[#bbdefb] text-blue-900 border border-[#90caf9]'
+                          : 'bg-[#ffebee] text-rose-900 border border-[#ffcdd2]'}`}>
                         {msg.content}
                       </div>
                     </div>
@@ -288,14 +288,14 @@ const HistoryPage = ({
               </div>
 
               {/* Continue button at bottom */}
-              <div className="p-4 border-t border-purple-500/20 flex gap-3">
+              <div className="p-5 border-t border-[#a5d6a7]/20 flex gap-4 bg-white/20">
                 <button onClick={() => handleContinue(selectedConv.session_id, 'chat')}
-                  className="w-1/2 py-3 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/50 hover:to-pink-600/50 border border-purple-500/30 rounded-xl text-white font-medium transition-all flex items-center justify-center gap-2">
-                  <FaComments /> Continue in Chat
+                  className="w-1/2 py-4 bg-teal-600 text-white hover:bg-teal-700 rounded-xl font-bold transition-all flex items-center justify-center gap-3 shadow-lg shadow-teal-500/10">
+                  <FaComments /> Continue Chat
                 </button>
                 <button onClick={() => handleContinue(selectedConv.session_id, 'voice')}
-                  className="w-1/2 py-3 bg-gradient-to-r from-pink-600/30 to-purple-600/30 hover:from-pink-600/50 hover:to-purple-600/50 border border-pink-500/30 rounded-xl text-white font-medium transition-all flex items-center justify-center gap-2">
-                  <FaMicrophone /> Continue in Voice
+                  className="w-1/2 py-4 bg-rose-500 text-white hover:bg-rose-600 rounded-xl font-bold transition-all flex items-center justify-center gap-3 shadow-lg shadow-rose-500/10">
+                  <FaMicrophone /> Continue Voice
                 </button>
               </div>
             </div>

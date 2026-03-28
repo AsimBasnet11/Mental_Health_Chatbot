@@ -53,7 +53,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
   };
 
   return (
-    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#f0f9f4] text-[#2d3436] overflow-hidden">
 
       <Sidebar
         onHomeClick={onHomeClick}
@@ -65,14 +65,14 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#f0f9f4] via-[#fef9f5] to-[#f0f7ff]">
 
         {/* Animated Stars Background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(100)].map((_, i) => (
             <div
               key={i}
-              className="absolute bg-white rounded-full opacity-35 animate-pulse"
+              className="absolute bg-[#a5d6a7]/40 rounded-full animate-pulse"
               style={{
                 width: `${Math.random() * 3 + 1}px`,
                 height: `${Math.random() * 3 + 1}px`,
@@ -85,19 +85,21 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
         </div>
 
         {/* Header */}
-        <div className="relative z-10 p-6 border-b border-purple-500/20 shrink-0">
+        <div className="relative z-10 p-6 border-b border-[#a5d6a7]/20 bg-white/40 backdrop-blur-md shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FaQuestionCircle className="text-3xl text-purple-400" />
+              <div className="p-2 bg-teal-500/10 rounded-lg shadow-sm">
+                <FaQuestionCircle className="text-3xl text-teal-600" />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-extrabold text-slate-800">
                   FAQs
                 </h1>
-                <p className="text-sm text-purple-300/60">Frequently asked questions</p>
+                <p className="text-sm text-slate-500 font-medium">Frequently asked questions</p>
               </div>
             </div>
             <button onClick={onBack}
-              className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all flex items-center gap-2">
+              className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-full transition-all flex items-center gap-2 shadow-sm font-bold">
               <FaArrowLeft /> Back
             </button>
           </div>
@@ -105,44 +107,44 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
 
         {/* Scrollable content */}
         <div
-          className="flex-1 overflow-y-auto p-6 relative z-10 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent"
+          className="flex-1 overflow-y-auto p-6 relative z-10 scrollbar-thin scrollbar-thumb-teal-200/40 scrollbar-track-transparent"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+            scrollbarColor: 'rgba(0,150,136,0.2) transparent',
           }}
         >
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="max-w-4xl mx-auto space-y-5">
             {faqs.map((faq, index) => (
               <div
                 key={index}
-                className="bg-[#1e1240]/60 backdrop-blur-md border border-purple-500/30 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
+                className="bg-white/70 backdrop-blur-md border border-[#a5d6a7]/30 rounded-2xl overflow-hidden hover:border-teal-400/50 transition-all shadow-sm group"
               >
                 {/* Question */}
                 <button
                   onClick={() => toggleFAQ(index)}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-purple-600/10 transition-all"
+                  className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-teal-50/50 transition-all"
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-600/30 rounded-full flex items-center justify-center text-sm font-bold">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="flex-shrink-0 w-8 h-8 bg-teal-500/10 rounded-full flex items-center justify-center text-xs font-bold text-teal-600 shadow-sm">
                       {index + 1}
                     </div>
-                    <h3 className="text-lg font-semibold text-purple-200">
+                    <h3 className="text-lg font-bold text-slate-700">
                       {faq.question}
                     </h3>
                   </div>
                   <div className="flex-shrink-0 ml-4">
                     {openIndex === index ? (
-                      <FaChevronUp className="text-purple-400" />
+                      <FaChevronUp className="text-teal-600" />
                     ) : (
-                      <FaChevronDown className="text-purple-400" />
+                      <FaChevronDown className="text-slate-400 group-hover:text-teal-500" />
                     )}
                   </div>
                 </button>
 
                 {/* Answer */}
                 {openIndex === index && (
-                  <div className="px-6 pb-4 pt-2 bg-[#120820]/50 border-t border-purple-500/20">
-                    <p className="text-purple-300/90 leading-relaxed whitespace-pre-line">
+                  <div className="px-10 pb-6 pt-2 bg-teal-50/30 border-t border-[#a5d6a7]/10 animate-fadeIn">
+                    <p className="text-slate-600 leading-relaxed font-medium whitespace-pre-line">
                       {faq.answer}
                     </p>
                   </div>
@@ -151,16 +153,16 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
             ))}
 
             {/* Help Section */}
-            <div className="mt-8 bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-md border border-purple-500/30 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-purple-300 mb-3">
+            <div className="mt-8 bg-gradient-to-r from-teal-50 to-sky-50 border border-teal-100 rounded-2xl p-8 shadow-sm">
+              <h3 className="text-xl font-bold text-teal-800 mb-2">
                 Still have questions?
               </h3>
-              <p className="text-purple-200 mb-4">
+              <p className="text-slate-600 mb-6 font-medium">
                 If you need additional help or have questions not covered here, please don't hesitate to reach out.
               </p>
               <button
                 onClick={onBack}
-                className="px-6 py-2 bg-purple-600/20 hover:bg-purple-600/40 rounded-full transition-all"
+                className="px-8 py-2.5 bg-teal-600 text-white hover:bg-teal-700 rounded-full transition-all font-bold shadow-lg shadow-teal-500/20"
               >
                 Back to Home
               </button>

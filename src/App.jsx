@@ -239,15 +239,15 @@ function App() {
 
   // Home (Chat) Page
   return (
-    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#f0f9f4] text-[#2d3436] overflow-hidden">
       <Sidebar {...navProps} currentPage={currentPage} />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#f0f9f4] via-[#fef9f5] to-[#f0f7ff]">
         {/* Stars */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
-            <div key={i} className="absolute bg-white rounded-full opacity-40 animate-pulse"
-              style={{ width: `${Math.random()*2+1}px`, height: `${Math.random()*2+1}px`,
+            <div key={i} className="absolute bg-green-200/40 rounded-full animate-pulse"
+              style={{ width: `${Math.random()*3+1}px`, height: `${Math.random()*3+1}px`,
                 top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
                 animationDuration: `${Math.random()*3+2}s` }} />
           ))}
@@ -257,7 +257,7 @@ function App() {
         {!sessionEnded && messages.length > 1 && (
           <div className="relative z-20 flex justify-end p-4 pb-0 shrink-0">
             <button onClick={handleEndSession}
-              className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-200 text-sm hover:bg-purple-600/50 transition-all">
+              className="px-4 py-2 rounded-full bg-orange-200/40 border border-orange-300/30 text-orange-800 text-sm hover:bg-orange-200/60 transition-all font-medium">
               End Session
             </button>
           </div>
@@ -266,18 +266,18 @@ function App() {
         {/* Messages */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent"
+          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 scrollbar-thin scrollbar-thumb-mint-300/40 scrollbar-track-transparent"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+            scrollbarColor: 'rgba(165,214,167,0.4) transparent',
           }}
         >
           {messages.map((msg, index) => (
             <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line text-justify
+              <div className={`inline-block px-4 py-2 rounded-2xl shadow-sm border break-words transition-transform duration-500 transform whitespace-pre-line text-justify
                 ${msg.sender === 'user'
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                  : 'bg-[#231550]/80 border border-purple-500/30 text-purple-100 animate-slideUp'}`}
+                  ? 'bg-gradient-to-r from-[#81d4fa] to-[#4fc3f7] text-slate-800 border-[#81d4fa]/30'
+                  : 'bg-[#fff3e0] border-[#ffe0b2] text-slate-800 animate-slideUp'}`}
                 style={{ maxWidth: '70%' }}>
                 {msg.text}
               </div>
@@ -286,12 +286,12 @@ function App() {
 
           {isTyping && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/80 border border-purple-500/30 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-200 mr-2">Bot is typing</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm bg-[#fff3e0] border border-[#ffe0b2] animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-orange-800 mr-2 text-sm font-medium">Aria is typing</span>
                 <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-200"></span>
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-400"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-400"></span>
                 </div>
               </div>
             </div>
@@ -299,12 +299,12 @@ function App() {
 
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/80 border border-purple-500/30 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-200 mr-2">Analyzing emotions</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm bg-[#e0f2f1] border border-[#b2dfdb] animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-teal-800 mr-2 text-sm font-medium">Analyzing emotions</span>
                 <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200"></span>
-                  <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-400"></span>
+                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-400"></span>
                 </div>
               </div>
             </div>

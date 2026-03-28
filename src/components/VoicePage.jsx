@@ -681,7 +681,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
   }, []);
 
   return (
-    <div className="flex h-screen bg-[#120820] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#f0f9f4] text-[#2d3436] overflow-hidden">
       
       <Sidebar 
         onHomeClick={onHomeClick}
@@ -693,16 +693,16 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         user={user} onLogout={onLogout} onNewChat={onNewChat}
       />
 
-      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#120820] via-[#1e1240] to-[#120820]">
+      <div className="flex flex-col flex-1 relative overflow-hidden bg-gradient-to-br from-[#f0f9f4] via-[#fef9f5] to-[#f0f7ff]">
 
         <div className="absolute inset-0 z-0 pointer-events-none">
           {[...Array(80)].map((_, i) => (
             <div 
               key={i} 
-              className="absolute bg-white rounded-full opacity-40 animate-pulse"
+              className="absolute bg-green-200/40 rounded-full animate-pulse"
               style={{
-                width: `${Math.random() * 2 + 1}px`,
-                height: `${Math.random() * 2 + 1}px`,
+                width: `${Math.random() * 3 + 1}px`,
+                height: `${Math.random() * 3 + 1}px`,
                 top: `${Math.random() * 100}%`,
                 left: `${Math.random() * 100}%`,
                 animationDuration: `${Math.random() * 3 + 2}s`
@@ -746,21 +746,21 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
             {/* TTS Toggle */}
             <button
               onClick={() => { setTtsEnabled(prev => { const next = !prev; ttsEnabledRef.current = next; if (!next) { window.speechSynthesis.cancel(); if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; } } return next; }); setIsSpeaking(false); }}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all backdrop-blur-md border shadow-sm
                 ${ttsEnabled
-                  ? 'bg-purple-600/40 border-purple-400/40 text-purple-100'
-                  : 'bg-gray-600/40 border-gray-500/30 text-gray-400'}`}
+                  ? 'bg-teal-600/20 border-teal-400/40 text-teal-800'
+                  : 'bg-gray-200/40 border-gray-300/30 text-gray-500'}`}
               title={ttsEnabled ? 'Mute voice responses' : 'Unmute voice responses'}
             >
               {ttsEnabled ? <FaVolumeUp className="text-sm" /> : <FaVolumeMute className="text-sm" />}
-              <span className="text-xs font-medium">{ttsEnabled ? 'TTS On' : 'TTS Off'}</span>
+              <span className="text-xs font-bold">{ttsEnabled ? 'TTS On' : 'TTS Off'}</span>
             </button>
           </div>
 
           {/* End Session */}
           {!sessionEnded && messages.length > 1 && (
             <button onClick={handleEndSession}
-              className="px-4 py-2 rounded-full bg-purple-600/30 border border-purple-500/30 text-purple-100 text-sm hover:bg-purple-600/50 transition-all">
+              className="px-4 py-2 rounded-full bg-orange-200/40 border border-orange-300/30 text-orange-800 text-sm hover:bg-orange-200/60 transition-all font-medium">
               End Session
             </button>
           )}
@@ -768,10 +768,10 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
         {/* Messages — purple scrollbar to match dark background */}
         <div
-          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 scrollbar-thin scrollbar-thumb-purple-700/40 scrollbar-track-transparent"
+          className="flex-1 overflow-y-auto p-8 space-y-3 relative z-10 scrollbar-thin scrollbar-thumb-mint-300/40 scrollbar-track-transparent"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: 'rgba(109,40,217,0.4) transparent',
+            scrollbarColor: 'rgba(165,214,167,0.4) transparent',
           }}
         >
           {messages.map((msg, index) => (
@@ -780,10 +780,10 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
             >
               <div 
-                className={`inline-block px-4 py-2 rounded-2xl backdrop-blur-md shadow-md break-words transition-transform duration-500 transform whitespace-pre-line text-justify
+                className={`inline-block px-4 py-2 rounded-2xl shadow-sm border break-words transition-transform duration-500 transform whitespace-pre-line text-justify
                   ${msg.isUser
-                    ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                    : 'bg-[#231550]/75 border border-purple-500/20 text-purple-100 animate-slideUp'}`}
+                    ? 'bg-gradient-to-r from-[#81d4fa] to-[#4fc3f7] text-slate-800 border-[#81d4fa]/30'
+                    : 'bg-[#fff3e0] border-[#ffe0b2] text-slate-800 animate-slideUp'}`}
                 style={{ maxWidth: '70%' }}
               >
                 {msg.text}
@@ -794,8 +794,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           {isListening && (
             <div className="flex justify-end">
               <div 
-                className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md
-                  bg-purple-600/30 border border-purple-400 text-white animate-fadeIn break-words"
+                className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm
+                  bg-[#e1f5fe] border border-[#b3e5fc] text-sky-800 animate-fadeIn break-words"
                 style={{ maxWidth: '60%' }}
               >
                 Listening{'.'.repeat(dotCount)}
@@ -807,8 +807,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
           {isStopping && (
             <div className="flex justify-end">
               <div 
-                className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md
-                  bg-yellow-600/30 border border-yellow-400 text-white animate-pulse"
+                className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm
+                  bg-amber-100 border border-amber-200 text-amber-800 animate-pulse"
                 style={{ maxWidth: '60%' }}
               >
                 Processing your speech...
@@ -818,12 +818,12 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/75 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-300 mr-2">Analyzing emotions</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm bg-[#e0f2f1] border border-[#b2dfdb] animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-teal-800 mr-2 text-sm font-medium">Analyzing emotions</span>
                 <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200"></span>
-                  <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-400"></span>
+                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-400"></span>
                 </div>
               </div>
             </div>
@@ -831,12 +831,12 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
 
           {isTyping && !isAnalyzing && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center px-4 py-2 rounded-2xl backdrop-blur-md shadow-md bg-[#231550]/75 border border-purple-500/20 animate-fadeIn" style={{ maxWidth: '40%' }}>
-                <span className="text-purple-300 mr-2">Bot is typing</span>
+              <div className="inline-flex items-center px-4 py-2 rounded-2xl shadow-sm bg-[#fff3e0] border border-[#ffe0b2] animate-fadeIn" style={{ maxWidth: '40%' }}>
+                <span className="text-orange-800 mr-2 text-sm font-medium">Aria is typing</span>
                 <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-200"></span>
-                  <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce delay-400"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-200"></span>
+                  <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce delay-400"></span>
                 </div>
               </div>
             </div>
@@ -850,7 +850,7 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
             
             <button 
               onClick={onBack}
-              className="absolute left-4 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-white rounded-full shadow-md shadow-purple-400/50 transition-all"
+              className="absolute left-4 px-4 py-2 bg-teal-600/10 hover:bg-teal-600/20 text-teal-700 rounded-full shadow-sm border border-teal-500/20 transition-all font-medium"
             >
               ← Back
             </button>
@@ -860,41 +860,41 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
               disabled={!isConnected || isStopping}
               className={`w-16 h-16 rounded-full flex items-center justify-center
                 ${!isConnected || isStopping
-                  ? 'bg-gray-600 opacity-50 cursor-not-allowed'
+                  ? 'bg-slate-400 opacity-50 cursor-not-allowed shadow-none'
                   : isListening 
-                    ? 'bg-red-600 shadow-[0_0_20px_rgba(255,0,0,0.7)] animate-pulse cursor-pointer'
-                    : 'bg-purple-600/30 shadow-[0_0_10px_rgba(138,43,226,0.4)] hover:scale-110 cursor-pointer'
+                    ? 'bg-red-500 shadow-lg shadow-red-400/50 animate-pulse cursor-pointer'
+                    : 'bg-[#a5d6a7] shadow-lg shadow-[#a5d6a7]/40 hover:bg-[#81c784] hover:scale-110 cursor-pointer'
                 }
-                transition-all animate-float`}
+                transition-all animate-float shadow-xl`}
               title={!isConnected ? "Connect to server first!" : isStopping ? "Processing..." : ""}
             >
-              <FaMicrophone className="text-white text-xl" />
+              <FaMicrophone className={isListening ? "text-white text-xl" : "text-slate-700 text-xl"} />
             </button>
 
             <button 
               onClick={handleRefresh}
-              className="absolute right-4 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-white rounded-full shadow-md shadow-purple-400/50 transition-all flex items-center gap-2"
+              className="absolute right-4 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-full shadow-sm border border-orange-200 transition-all flex items-center gap-2 font-medium"
             >
-              <FaRedo className="text-sm" />
+              <FaRedo className="text-xs" />
               Refresh
             </button>
           </div>
 
-          <div className="mt-4 text-xs text-purple-300/60 text-center px-4">
+          <div className="mt-4 text-[10px] text-slate-500 text-center px-4 font-medium">
             {connectionStatus === 'connecting' && (
-              <div className="text-yellow-400 mb-2 font-bold">Connecting to server...</div>
+              <div className="text-orange-600 mb-2 font-bold animate-pulse">Connecting to server...</div>
             )}
             {connectionStatus === 'disconnected' && (
-              <div className="text-yellow-400 mb-2 font-bold">Click "Connect Server" to enable voice recording.</div>
+              <div className="text-slate-400 mb-2">Click "Connect Server" to enable voice recording.</div>
             )}
             {connectionStatus === 'connected' && (
-              <div className="text-green-400 mb-2">Server connected — you can record multiple times.</div>
+              <div className="text-teal-600 mb-1 font-bold">Server connected — ready to listen.</div>
             )}
             {connectionStatus === 'error' && (
-              <div className="text-red-400 mb-2">Connection error — try reconnecting.</div>
+              <div className="text-red-500 mb-1 font-bold underline">Connection error — try reconnecting.</div>
             )}
             {isSpeaking && (
-              <div className="text-purple-300 mb-1 animate-pulse">Speaking...</div>
+              <div className="text-sky-600 mb-1 animate-pulse font-bold italic">Aria is speaking...</div>
             )}
             This is an AI assistant for emotional support. For crisis situations, please contact emergency services or a mental health professional.
           </div>
