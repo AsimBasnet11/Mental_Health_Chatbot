@@ -146,7 +146,7 @@ class SummaryIn(BaseModel):
     session_id: str = "default"
 class TTSIn(BaseModel):
     text: str
-    voice: str = "en-US-SaraNeural"
+    voice: str = "en-US-JennyNeural"
 
 
 # ── Session store with TTL-based cleanup (#6) ───────────────
@@ -367,24 +367,31 @@ def analyze(body: AnalyzeIn, current_user=Depends(get_optional_user)):
     return result
 
 
-# ── Text-to-Speech (Edge TTS — natural neural voices) ───────
+# ── Text-to-Speech (Edge TTS — Low Latency Streaming) ───────
 @app.post("/api/tts")
 async def tts(body: TTSIn):
     if not body.text or not body.text.strip():
         raise HTTPException(400, "Text cannot be empty.")
-    text = body.text.strip()[:2000]  # Limit length
-    try:
-        communicate = edge_tts.Communicate(text, body.voice, rate="-5%", pitch="+5Hz")
-        audio_buffer = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_buffer.write(chunk["data"])
-        audio_buffer.seek(0)
-        return StreamingResponse(audio_buffer, media_type="audio/mpeg",
-            headers={"Content-Disposition": "inline; filename=tts.mp3"})
-    except Exception as e:
-        log.error("TTS failed: %s", e)
-        raise HTTPException(500, "TTS generation failed.")
+    
+    text = body.text.strip()[:2000]
+    # Enforce female voice if requested voice is male or unspecified
+    female_voice = body.voice if "Neural" in body.voice and ("Jenny" in body.voice or "Aria" in body.voice or "Emma" in body.voice or "Ava" in body.voice) else "en-US-JennyNeural"
+    
+    async def audio_generator():
+        try:
+            communicate = edge_tts.Communicate(text, female_voice, rate="+0%", pitch="+0Hz")
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    yield chunk["data"]
+        except Exception as e:
+            log.error(f"Streaming TTS error: {e}")
+            # We can't raise HTTPException middle-stream, so just stop
+    
+    return StreamingResponse(
+        audio_generator(), 
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline; filename=tts.mp3"}
+    )
 
 
 @app.get("/api/conversations")

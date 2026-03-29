@@ -10,5 +10,6 @@ export const ENDPOINTS = {
   HISTORY: "/api/conversations",
   SUMMARY: "/api/summary",
   HEALTH: "/health",
-  HISTORY_ITEMS: "/history"
+  HISTORY_ITEMS: "/history",
+  TTS: "/api/tts"
 };

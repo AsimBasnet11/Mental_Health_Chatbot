@@ -12,7 +12,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "How does the voice recognition work?",
-      answer: "We use Whisper medium, a speech recognition model optimized \nfor South Asian accents, running in real-time for accurate \ntranscription. It includes a hallucination filter to remove \nfalse transcriptions and a filler word remover for cleaner text."
+      answer: "We use Whisper medium, a speech recognition model optimized for South Asian accents, running in real-time for accurate transcription. It includes a hallucination filter to remove false transcriptions and a filler word remover for cleaner text."
     },
     {
       question: "How is my mental state analyzed?",
@@ -20,7 +20,7 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "Is my data private and secure?",
-      answer: "Your data is securely stored on our server with JWT \nauthentication. Each user has their own private conversation \nhistory. Voice data is processed in real-time and not \npermanently stored on our servers."
+      answer: "Your data is securely stored on our server with JWT authentication. Each user has their own private conversation history. Voice data is processed in real-time and not permanently stored on our servers."
     },
     {
       question: "Can this replace professional therapy?",
@@ -36,11 +36,11 @@ const FAQsPage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, onF
     },
     {
       question: "Can I view my analysis history?",
-      answer: "Yes! Click on the History button in the sidebar to see \nyour full conversation history including timestamps, \nemotions detected, and mental health states. You can also \ncontinue any past conversation from the history page."
+      answer: "Yes! Click on the History button in the sidebar to see your full conversation history including timestamps, emotions detected, and mental health states. You can also continue any past conversation from the history page."
     },
     {
       question: "What should I do if I'm feeling suicidal?",
-      answer: "If you're experiencing suicidal thoughts, please seek \nimmediate help. Nepal Mental Health Helpline: 1166 \n(TPO Nepal) or Saathi Helpline: 1145. You are not alone \n— help is available 24/7. You can also visit your nearest \nhospital emergency department immediately."
+      answer: "If you're experiencing suicidal thoughts, please seek immediate help. Nepal Mental Health Helpline: 1166 (TPO Nepal) or Saathi Helpline: 1145. You are not alone — help is available 24/7. You can also visit your nearest hospital emergency department immediately."
     },
     {
       question: "How can I improve the accuracy of voice recognition?",

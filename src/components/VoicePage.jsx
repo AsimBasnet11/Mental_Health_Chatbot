@@ -132,8 +132,8 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       const res = await fetch(`${API_BASE}${ENDPOINTS.TTS}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // en-US-AriaNeural — warm, natural, human-like female voice
-        body: JSON.stringify({ text, voice: "en-US-AriaNeural" })
+        // en-US-JennyNeural — Very friendly, warm, and human-like female voice
+        body: JSON.stringify({ text, voice: "en-US-JennyNeural" })
       });
 
       // Check again after async — user may have toggled off while fetching
@@ -166,22 +166,21 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
       setIsSpeaking(false);
       // Check again before browser fallback
       if (!ttsEnabledRef.current) return;
-      // Fallback to browser TTS — most human-like female voice available
+      // Fallback to browser TTS — strictly picking female voices
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.88;
-      utterance.pitch = 1.1;
-      utterance.volume = 1.0;
-      // Try to pick a female voice
+      utterance.rate = 1.0; // Normal conversational speed
+      utterance.pitch = 1.0;
+      // Filter for strictly female-sounding voices
       const voices = window.speechSynthesis.getVoices();
-      const femaleVoice = voices.find(v =>
-        v.name.includes('Female') ||
-        v.name.includes('Samantha') ||
-        v.name.includes('Karen') ||
-        v.name.includes('Moira') ||
-        v.name.includes('Aria') ||
-        v.name.includes('Jenny') ||
+      const femaleVoice = voices.find(v => (
+        v.name.toLowerCase().includes('female') ||
+        v.name.toLowerCase().includes('samantha') ||
+        v.name.toLowerCase().includes('aria') ||
+        v.name.toLowerCase().includes('jenny') ||
+        v.name.toLowerCase().includes('emma') ||
+        v.name.toLowerCase().includes('ava') ||
         (v.name.includes('Google') && v.name.includes('US') && v.lang === 'en-US')
-      );
+      ));
       if (femaleVoice) utterance.voice = femaleVoice;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
