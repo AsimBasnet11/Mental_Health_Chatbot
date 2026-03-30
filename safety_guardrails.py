@@ -68,10 +68,10 @@ _HALLUCINATION_PHRASES = [
 
 _HARMFUL_SEMANTIC_PATTERNS = re.compile(
     r"(?:"
-    r"(?:it's|it is|things are) (?:never )?going to get better"
-    r"|you're wasting (?:your|the) time"
-    r"|therapy (?:won't|will not|can't) help (?:you|anyone)"
-    r"|you(?:'re| are) (?:beyond|past) (?:help|saving|hope)"
+    r"(?:it'?s|it is|things are) (?:never )?going to get better"
+    r"|you'?re wasting (?:your|the) time"
+    r"|therapy (?:won'?t|will not|can'?t) help (?:you|anyone)"
+    r"|you(?:'?re| are) (?:beyond|past) (?:help|saving|hope)"
     r"|there'?s no point (?:in )?(?:trying|getting help|seeking help|continuing)"
     r"|nothing (?:can|will) (?:help|save|fix) (?:you|this|anything)"
     r"|just give up"
