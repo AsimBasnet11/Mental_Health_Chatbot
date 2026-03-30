@@ -18,7 +18,9 @@ KEYWORD_MAP = {
         r"\bavoidant\b", r"\bdependent\b", r"\bschizoid\b", r"\bschizotypal\b", r"\bhistrionic\b", r"\bnarcissistic\b"
     ],
     "Suicidal": [
-        r"\bsuicid(al|e)\b", r"\bend my life\b", r"\bkill myself\b", r"\bwant to die\b", r"\bno reason to live\b",
+        r"\bi\s*(?:am|feel|been|'m)\s*suicidal\b",
+        r"\bsuicidal\s*(?:thoughts|ideation|urges|feelings)\b",
+        r"\bend my life\b", r"\bkill myself\b", r"\bwant to die\b", r"\bno reason to live\b",
         r"\bcan'?t go on\b", r"\bnot worth living\b", r"\bgive up\b", r"\bbetter off dead\b", r"\bself-harm\b"
     ],
 }
@@ -249,8 +251,11 @@ def _infer_emotion_probs(text, tokenizer, model):
 # The model is strong but not perfect on safety-critical cases.
 # These keywords act as a FLOOR — they can raise the suicidal score
 # but never suppress it. Triggered only when model confidence is low.
+# NOTE: "suicide"/"suicidal" without first-person context are excluded
+# because they often appear in grief contexts (e.g. "my friend committed
+# suicide") where the user is NOT expressing personal suicidal ideation.
 _SUICIDAL_KEYWORDS = re.compile(
-    r"\b(kill\s*(my|him|her|them)?self|suicide|suicidal|end\s*my\s*life"
+    r"\b(kill\s*(my|him|her|them)?self|end\s*my\s*life"
     r"|want\s*to\s*die(?!\s+(?:of|from|because|so)\b)"
     r"|don'?t\s*want\s*to\s*(live|exist)|no\s*reason\s*to\s*live"
     r"|better\s*off\s*(dead|without\s*me)|take\s*my\s*(own\s*)?life"
@@ -262,14 +267,21 @@ _SUICIDAL_KEYWORDS = re.compile(
     r"|nobody\s*(would|will)\s*(notice|miss|care)"
     r"|not\s*be\s*(here|around)\s*anymore"
     r"|wish\s*i\s*(wasn'?t|was\s*not|weren'?t)\s*(here|alive|born)"
-    r"|wish\s*i\s*(was|were)\s*never\s*born)\b",
+    r"|wish\s*i\s*(was|were)\s*never\s*born"
+    r"|i\s*(?:am|feel|been)?\s*(?:feeling\s+)?suicidal\b"
+    r"|suicidal\s*(?:thoughts|ideation|urges|feelings))\b",
     re.IGNORECASE,
 )
 
 # Idiomatic phrases that should NOT trigger the suicidal safety net
 _SUICIDAL_FALSE_POSITIVE_RE = re.compile(
     r"\b(could|would|gonna|going to)\s+kill\s+(for|over)\b"
-    r"|\b(die|dying)\s+(of|from)\s+(embarrassment|laughter|boredom|curiosity|excitement|anticipation)\b",
+    r"|\b(die|dying)\s+(of|from)\s+(embarrassment|laughter|boredom|curiosity|excitement|anticipation)\b"
+    r"|\b(friend|family|mother|father|brother|sister|partner|husband|wife"
+    r"|colleague|neighbor|someone|person|people|he|she|they)\b"
+    r".{0,30}\b(committed|died?\s+by|lost\s+(?:to|her|his|their)|death\s+by)\s+suicide\b"
+    r"|\bsuicide\b.{0,30}\b(of|by|about|regarding|related\s+to)\b"
+    r".{0,20}\b(friend|family|mother|father|brother|sister|partner|husband|wife|loved\s+one)\b",
     re.IGNORECASE,
 )
 

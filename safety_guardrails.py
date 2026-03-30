@@ -66,6 +66,11 @@ _HALLUCINATION_PHRASES = [
     "as an artificial intelligence",
 ]
 
+_HALLUCINATION_PLACEHOLDER_RE = re.compile(
+    r'\[[\w\s]*?(?:name|platform|website|link|resource|app|service|number|url)[\w\s]*?\]',
+    re.IGNORECASE,
+)
+
 _HARMFUL_SEMANTIC_PATTERNS = re.compile(
     r"(?:"
     r"(?:it'?s|it is|things are) (?:never )?going to get better"
@@ -90,7 +95,7 @@ _DIAGNOSIS_PHRASES = [
 # Cliche sentences to remove — kept narrow after fine-tuning
 _CLICHE_RE = re.compile(
     r"[^.!?]*\b("
-    r"it('s| is) (important|essential|crucial|vital) to remember"
+    r"it('s| is) (important|essential|crucial|vital) to (remember|give yourself|take care)"
     r"|it('s| is) (important|essential|crucial|vital) that you"
     r"|everyone (experiences|goes through|faces) (challenges|setbacks|failures|this)"
     r"|failure doesn't define"
@@ -199,6 +204,13 @@ def apply_safety_guardrails(response, category_score=1.0,
             parts = re.split(r'(?<=[.!?])\s+', response)
             parts = [s for s in parts if phrase not in s.lower()]
             response = " ".join(parts)
+
+    # Rule 3a — Strip hallucinated placeholders like [Platform name]
+    response = _HALLUCINATION_PLACEHOLDER_RE.sub('', response).strip()
+    response = re.sub(r'\s{2,}', ' ', response).strip()
+    response = re.sub(r'\s+\b(such as|like|including|through)\s*[.!?]', '.', response)
+    response = re.sub(r'\w+\s+[.!?]', '.', response)
+    response = re.sub(r'\s{2,}', ' ', response).strip()
 
     # Rule 3b — Semantic hallucination check (catches harmful therapeutic
     # language that regex patterns on individual phrases may miss)
