@@ -561,7 +561,11 @@ async def warmup_models():
         from detection import _load_sentiment_model, _load_emotion_model
         _load_sentiment_model()
         _load_emotion_model()
-        log.info("Detection models loaded")
+        # Run a dummy inference to trigger JIT compilation / CUDA kernel loading
+        from detection import classify_mental_health_with_scores, detect_emotion
+        classify_mental_health_with_scores("hello")
+        detect_emotion("hello")
+        log.info("Detection models loaded and warmed up")
     except Exception as e:
         log.error("Detection model warmup failed: %s", e)
     # RAG removed — no warmup required

@@ -251,9 +251,25 @@ def _infer_emotion_probs(text, tokenizer, model):
 # but never suppress it. Triggered only when model confidence is low.
 _SUICIDAL_KEYWORDS = re.compile(
     r"\b(kill\s*(my|him|her|them)?self|suicide|suicidal|end\s*my\s*life"
-    r"|want\s*to\s*die|don'?t\s*want\s*to\s*(live|exist)|no\s*reason\s*to\s*live"
+    r"|want\s*to\s*die(?!\s+(?:of|from|because|so)\b)"
+    r"|don'?t\s*want\s*to\s*(live|exist)|no\s*reason\s*to\s*live"
     r"|better\s*off\s*(dead|without\s*me)|take\s*my\s*(own\s*)?life"
-    r"|can'?t\s*go\s*on|not\s*worth\s*living|goodbye\s*forever)\b",
+    r"|can'?t\s*go\s*on|not\s*worth\s*living|goodbye\s*forever"
+    r"|end\s*(it|everything)(?!\s+(?:all)?\s*(?:right|well|now|there))"
+    r"|ending\s*(it|everything|it\s*all)"
+    r"|ways?\s*to\s*die|painless\s*ways?"
+    r"|if\s*i\s*(was|were)\s*gone"
+    r"|nobody\s*(would|will)\s*(notice|miss|care)"
+    r"|not\s*be\s*(here|around)\s*anymore"
+    r"|wish\s*i\s*(wasn'?t|was\s*not|weren'?t)\s*(here|alive|born)"
+    r"|wish\s*i\s*(was|were)\s*never\s*born)\b",
+    re.IGNORECASE,
+)
+
+# Idiomatic phrases that should NOT trigger the suicidal safety net
+_SUICIDAL_FALSE_POSITIVE_RE = re.compile(
+    r"\b(could|would|gonna|going to)\s+kill\s+(for|over)\b"
+    r"|\b(die|dying)\s+(of|from)\s+(embarrassment|laughter|boredom|curiosity|excitement|anticipation)\b",
     re.IGNORECASE,
 )
 
@@ -265,6 +281,9 @@ def _apply_suicidal_safety_net(probs, text):
     raise suicidal score to a safe floor and renormalise.
     This is a safety net — it never suppresses an already high score."""
     if not _SUICIDAL_KEYWORDS.search(text):
+        return probs
+    # Guard: skip if the match is an idiomatic phrase (e.g. "die of embarrassment")
+    if _SUICIDAL_FALSE_POSITIVE_RE.search(text):
         return probs
 
     current_suicidal = float(probs[SUICIDAL_IDX])
@@ -348,15 +367,41 @@ def classify_mental_health_with_scores(text):
     if not cleaned:
         return ("Normal", 0.5, {})
 
-    # First, try keyword-based detection
-    keyword_label, keyword_avg = keyword_state_count(cleaned)
-    if keyword_label != "Normal":
-        all_scores = {k: 1.0 if k == keyword_label else 0.0 for k in SENTIMENT_LABELS}
-        return (keyword_label, keyword_avg, all_scores)
-    # Otherwise, use model-based detection
+    # Always run the model to get nuanced probability distribution
     expanded = _expand_short_text(cleaned)
     probs = _infer_best_chunk(expanded, tokenizer, model)
+    # Suppress model's false positive suicidal score (e.g. "die of embarrassment")
+    is_false_positive = bool(_SUICIDAL_FALSE_POSITIVE_RE.search(cleaned))
+    if is_false_positive and probs[SUICIDAL_IDX] > 0.3:
+        probs = probs.copy()
+        probs[SUICIDAL_IDX] = 0.01
+        total = probs.sum()
+        if total > 0:
+            probs = probs / total
     probs = _apply_suicidal_safety_net(probs, cleaned)
+    # Post-safety-net: if safety net raised score but phrase is false positive, revert
+    if is_false_positive and probs[SUICIDAL_IDX] > 0.3:
+        probs = probs.copy()
+        probs[SUICIDAL_IDX] = 0.01
+        total = probs.sum()
+        if total > 0:
+            probs = probs / total
+
+    # Check keyword detection as a separate signal
+    keyword_label, keyword_avg = keyword_state_count(cleaned)
+    if keyword_label != "Normal" and keyword_label in SENTIMENT_LABELS:
+        # Blend: boost the keyword-matched class with model's own probability
+        # instead of replacing all scores with binary 1.0/0.0
+        keyword_idx = SENTIMENT_LABELS.index(keyword_label)
+        blended = probs.copy()
+        keyword_boost = min(keyword_avg, 0.9)
+        model_weight = 0.4
+        kw_weight = 1.0 - model_weight
+        blended[keyword_idx] = model_weight * float(probs[keyword_idx]) + kw_weight * keyword_boost
+        total = blended.sum()
+        if total > 0:
+            probs = blended / total
+
     top_idx = int(np.argmax(probs))
     depression_idx = SENTIMENT_LABELS.index("Depression")
     depression_score = float(probs[depression_idx])

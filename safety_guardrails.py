@@ -66,6 +66,21 @@ _HALLUCINATION_PHRASES = [
     "as an artificial intelligence",
 ]
 
+_HARMFUL_SEMANTIC_PATTERNS = re.compile(
+    r"(?:"
+    r"(?:it's|it is|things are) (?:never )?going to get better"
+    r"|you're wasting (?:your|the) time"
+    r"|therapy (?:won't|will not|can't) help (?:you|anyone)"
+    r"|you(?:'re| are) (?:beyond|past) (?:help|saving|hope)"
+    r"|there'?s no point (?:in )?(?:trying|getting help|seeking help|continuing)"
+    r"|nothing (?:can|will) (?:help|save|fix) (?:you|this|anything)"
+    r"|just give up"
+    r"|you should give up"
+    r"|mental illness (?:is )?(?:a )?(?:choice|fake|made up)"
+    r")\b",
+    re.IGNORECASE,
+)
+
 _DIAGNOSIS_PHRASES = [
     "you have", "you are diagnosed", "you suffer from",
     "you are suffering from", "your diagnosis is",
@@ -184,6 +199,14 @@ def apply_safety_guardrails(response, category_score=1.0,
             parts = re.split(r'(?<=[.!?])\s+', response)
             parts = [s for s in parts if phrase not in s.lower()]
             response = " ".join(parts)
+
+    # Rule 3b — Semantic hallucination check (catches harmful therapeutic
+    # language that regex patterns on individual phrases may miss)
+    if _HARMFUL_SEMANTIC_PATTERNS.search(response):
+        response = HARMFUL_OUTPUT_FALLBACK
+        if category and category.lower() == "suicidal":
+            response += " " + CRISIS_RESOURCES
+        return _ensure_complete_sentence(response)
 
     # Rule 4 — Response too short
     if len(response.split()) < 10:
