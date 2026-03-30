@@ -17,6 +17,9 @@ Changes:
 """
 
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_complete_sentence(text):
@@ -71,6 +74,11 @@ _HALLUCINATION_PLACEHOLDER_RE = re.compile(
     re.IGNORECASE,
 )
 
+_HALLUCINATION_REPLACEMENTS = [
+    (re.compile(r"\bour loved ones\b", re.I), "your loved ones"),
+    (re.compile(r"\bour (friend|family|partner)\b", re.I), r"your \1"),
+]
+
 _HARMFUL_SEMANTIC_PATTERNS = re.compile(
     r"(?:"
     r"(?:it'?s|it is|things are) (?:never )?going to get better"
@@ -95,7 +103,7 @@ _DIAGNOSIS_PHRASES = [
 # Cliche sentences to remove — kept narrow after fine-tuning
 _CLICHE_RE = re.compile(
     r"[^.!?]*\b("
-    r"it('s| is) (important|essential|crucial|vital) to (remember|give yourself|take care)"
+    r"it('s| is) (important|essential|crucial|vital) to (remember|give yourself|take care|give)"
     r"|it('s| is) (important|essential|crucial|vital) that you"
     r"|everyone (experiences|goes through|faces) (challenges|setbacks|failures|this)"
     r"|failure doesn't define"
@@ -173,7 +181,7 @@ def apply_safety_guardrails(response, category_score=1.0,
     # Rule 0c — Strip cliche/clinical sentences (narrow)
     cleaned = _CLICHE_RE.sub('', response).strip()
     cleaned = _SOFT_LIST_RE.sub('', cleaned).strip()
-    if len(cleaned.split()) >= 8:
+    if len(cleaned.split()) >= 5:
         response = cleaned
     response = re.sub(r'  +', ' ', response).strip()
 
@@ -212,6 +220,10 @@ def apply_safety_guardrails(response, category_score=1.0,
     response = re.sub(r'\w+\s+[.!?]', '.', response)
     response = re.sub(r'\s{2,}', ' ', response).strip()
 
+    # Rule 3a2 — Fix hallucinated pronouns (e.g. "our loved ones" → "your loved ones")
+    for pattern, replacement in _HALLUCINATION_REPLACEMENTS:
+        response = pattern.sub(replacement, response)
+
     # Rule 3b — Semantic hallucination check (catches harmful therapeutic
     # language that regex patterns on individual phrases may miss)
     if _HARMFUL_SEMANTIC_PATTERNS.search(response):
@@ -244,6 +256,15 @@ def apply_safety_guardrails(response, category_score=1.0,
             sentences.append(last_sentence)
     response = ' '.join(sentences)
     response = _ensure_complete_sentence(response)
+
+    # Rule 5b — Keep only the last follow-up question, strip extras
+    question_sentences = [s for s in re.split(r'(?<=[.!?])\s+', response) if s.endswith('?')]
+    if len(question_sentences) > 1:
+        last_q = question_sentences[-1]
+        parts = re.split(r'(?<=[.!?])\s+', response)
+        # Keep all non-question sentences + only the last question
+        kept = [s for s in parts if not s.endswith('?')] + [last_q]
+        response = ' '.join(kept)
 
     # Rule 6 — Strip any helpline sentences the model hallucinated
     # always runs before Rule 7 so we never accidentally strip the correct ones
