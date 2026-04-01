@@ -178,10 +178,13 @@ const VoicePage = ({ onBack, onHomeClick, onMentalStateClick, onHistoryClick, on
         v.name.toLowerCase().includes('aria') ||
         v.name.toLowerCase().includes('jenny') ||
         v.name.toLowerCase().includes('emma') ||
-        v.name.toLowerCase().includes('ava') ||
-        (v.name.includes('Google') && v.name.includes('US') && v.lang === 'en-US')
+        v.name.toLowerCase().includes('ava')
       ));
-      if (femaleVoice) utterance.voice = femaleVoice;
+      if (!femaleVoice) {
+        console.warn('[TTS] No female browser voice available, skipping fallback playback.');
+        return;
+      }
+      utterance.voice = femaleVoice;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);

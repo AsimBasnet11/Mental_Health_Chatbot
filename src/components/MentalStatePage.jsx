@@ -98,6 +98,11 @@ const computeTrend = (values) => {
 const trendColor = (t) =>
   t === 'Improving' ? 'text-emerald-600' : t === 'Worsening' ? 'text-rose-600' : 'text-amber-600';
 
+const NEGATIVE_EMOTIONS = new Set([
+  'sadness', 'grief', 'fear', 'nervousness', 'anger',
+  'disappointment', 'embarrassment', 'disapproval', 'annoyance', 'remorse',
+]);
+
 /* ══════════════════════════════════════════════════════════
    Aggregate a session's messages into ONE overall result
    ══════════════════════════════════════════════════════════ */
@@ -125,41 +130,32 @@ const aggregateSession = (messages) => {
     if (count > 0) avgMentalScores[label] = parseFloat((sum / count).toFixed(1));
   });
 
-  const SEVERITY_ORDER = [
-    'suicidal', 'depression', 'bipolar', 'personality disorder',
-    'anxiety', 'normal'
-  ];
   const CONFIDENCE_THRESHOLD = 5;
-
-  const labelFrequency = {};
-  messages.forEach(m => {
-    const label = getItemMentalLabel(m)?.toLowerCase();
-    if (label && label !== 'unknown') {
-      labelFrequency[label] = (labelFrequency[label] || 0) + 1;
-    }
-  });
-  const totalMessages = messages.length || 1;
-
-  const candidates = Object.entries(avgMentalScores)
-    .filter(([label, conf]) => label.toLowerCase() !== 'normal' && conf >= CONFIDENCE_THRESHOLD)
-    .map(([label, conf]) => {
-      const freq = (labelFrequency[label.toLowerCase()] || 0) / totalMessages;
-      const severityRank = SEVERITY_ORDER.indexOf(label.toLowerCase());
-      const rank = severityRank === -1 ? 98 : severityRank;
-      const composite = rank * 10000 - (freq * 50) - (conf * 0.5);
-      return { label, conf, freq, rank, composite };
-    });
-
   let topMentalLabel = 'Unknown', topMentalConf = 0;
 
-  if (candidates.length > 0) {
-    candidates.sort((a, b) => a.composite - b.composite);
-    topMentalLabel = candidates[0].label;
-    topMentalConf = candidates[0].conf;
-  } else {
+  // Overall mental state should match the breakdown chart: pick highest average score.
+  Object.entries(avgMentalScores).forEach(([label, conf]) => {
+    if (conf > topMentalConf) {
+      topMentalLabel = label;
+      topMentalConf = conf;
+    }
+  });
+
+  // If Normal is only slightly higher than a non-normal state,
+  // prefer the stronger non-normal signal for overall summary.
+  if (topMentalLabel.toLowerCase() === 'normal') {
+    let bestNonNormalLabel = null;
+    let bestNonNormalConf = -1;
     Object.entries(avgMentalScores).forEach(([label, conf]) => {
-      if (conf > topMentalConf) { topMentalLabel = label; topMentalConf = conf; }
+      if (label.toLowerCase() !== 'normal' && conf > bestNonNormalConf) {
+        bestNonNormalLabel = label;
+        bestNonNormalConf = conf;
+      }
     });
+    if (bestNonNormalLabel && (topMentalConf - bestNonNormalConf) <= 20) {
+      topMentalLabel = bestNonNormalLabel;
+      topMentalConf = bestNonNormalConf;
+    }
   }
 
   if (topMentalLabel === 'Unknown' || topMentalConf === 0) {
@@ -174,18 +170,11 @@ const aggregateSession = (messages) => {
       }
     });
     const fallbackCandidates = Object.entries(labelCount)
-      .filter(([label]) => label.toLowerCase() !== 'normal')
       .map(([label, { total, count }]) => ({ label, avg: total / count, count }))
-      .filter(({ avg }) => avg >= CONFIDENCE_THRESHOLD);
+      .filter(({ avg }) => avg >= CONFIDENCE_THRESHOLD)
+      .sort((a, b) => b.avg - a.avg);
+
     if (fallbackCandidates.length > 0) {
-      fallbackCandidates.sort((a, b) => {
-        const rA = SEVERITY_ORDER.indexOf(a.label.toLowerCase());
-        const rB = SEVERITY_ORDER.indexOf(b.label.toLowerCase());
-        const sA = rA === -1 ? 98 : rA;
-        const sB = rB === -1 ? 98 : rB;
-        if (sA !== sB) return sA - sB;
-        return b.avg - a.avg;
-      });
       topMentalLabel = fallbackCandidates[0].label;
       topMentalConf = parseFloat(fallbackCandidates[0].avg.toFixed(1));
       avgMentalScores[topMentalLabel] = topMentalConf;
@@ -216,6 +205,26 @@ const aggregateSession = (messages) => {
       topEmotionFreq = count;
     }
   });
+
+  // Emotion-aware safeguard: if dominant emotion is strongly negative,
+  // and there is a meaningful non-normal signal, avoid reporting Normal.
+  if ((topMentalLabel || '').toLowerCase() === 'normal' && topEmotionLabel) {
+    const emo = String(topEmotionLabel).toLowerCase();
+    if (NEGATIVE_EMOTIONS.has(emo) && topEmotionConf >= 65) {
+      let bestNonNormalLabel = null;
+      let bestNonNormalConf = -1;
+      Object.entries(avgMentalScores).forEach(([label, conf]) => {
+        if (label.toLowerCase() !== 'normal' && conf > bestNonNormalConf) {
+          bestNonNormalLabel = label;
+          bestNonNormalConf = conf;
+        }
+      });
+      if (bestNonNormalLabel && bestNonNormalConf >= 20) {
+        topMentalLabel = bestNonNormalLabel;
+        topMentalConf = bestNonNormalConf;
+      }
+    }
+  }
 
   const highRisk = messages.some(m => m.highRisk);
 

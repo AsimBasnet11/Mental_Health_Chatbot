@@ -6,7 +6,7 @@ from prompt_builder import build_prompt
 from safety_guardrails import apply_safety_guardrails
 from conversation_history import ConversationHistory
 from session_summary import generate_session_summary
-from detection import detect_emotion, classify_mental_health_with_scores
+from detection import detect_emotion, classify_mental_health_with_context
 
 _log = _logging.getLogger("mindcare.pipeline")
 _llm_responder = None
@@ -35,6 +35,18 @@ _RUN_DETECTION_STATUSES = {
     "delusion", "minimization", "harmful_coping",
 }
 
+_GREETING_ONLY_WORDS = {
+    "hi", "hello", "hey", "good morning", "good evening", "good afternoon",
+    "bye", "goodbye", "thanks", "thank you", "ok", "okay", "sure", "yes", "no",
+    "maybe", "greetings", "howdy",
+}
+
+
+def _is_greeting_only_message(text):
+    cleaned = _re.sub(r"\s+", " ", (text or "").strip().lower())
+    cleaned = cleaned.strip("!?.,")
+    return cleaned in _GREETING_ONLY_WORDS
+
 def _diversity_score(resp, recent):
     """Score response diversity vs recent responses. Higher = more diverse."""
     if not recent:
@@ -54,14 +66,49 @@ def process_user_input(user_message, conversation_history):
     has_history = len(conversation_history) > 0
     gate_result = check_input(user_message, has_history=has_history, llm_instance=_get_llm_responder())
     status = gate_result["status"]
+    show_analysis = False
+    greeting_only = _is_greeting_only_message(user_message)
 
     # Step 2 & 3: Detection
-    if status in _RUN_DETECTION_STATUSES:
+    if status in _RUN_DETECTION_STATUSES and not greeting_only:
         emotion, emotion_score = detect_emotion(user_message)
-        category, category_score, all_scores = classify_mental_health_with_scores(user_message)
+        # Build recent user context so short follow-ups can inherit prior state.
+        prev_category, prev_category_score = None, 0.0
+        recent_user_context = []
+        if len(conversation_history) > 0:
+            last_user_msg = None
+            for msg in reversed(conversation_history.messages):
+                if msg.get("role") == "user":
+                    if last_user_msg is None:
+                        last_user_msg = msg
+                    recent_user_context.append({
+                        "content": msg.get("content", ""),
+                        "category": msg.get("category"),
+                        "category_score": msg.get("category_score", 0.0),
+                    })
+                    if len(recent_user_context) >= 4:
+                        break
+            if last_user_msg:
+                prev_category = last_user_msg.get("category")
+                prev_category_score = last_user_msg.get("category_score", 0.0)
+
+        recent_user_context.reverse()
+        category, category_score, all_scores = classify_mental_health_with_context(
+            user_message,
+            prev_category=prev_category,
+            prev_category_score=prev_category_score,
+            conversation_context=recent_user_context,
+        )
+
+        # Skip sentiment display for pure greetings
+        if category == "Normal" and category_score >= 0.95 and emotion == "neutral":
+            show_analysis = False
+        else:
+            show_analysis = True
     else:
         emotion, emotion_score = None, 0.0
         category, category_score, all_scores = None, 0.0, {}
+        show_analysis = False
 
     if status != "proceed":
         conversation_history.add_user_message(
@@ -75,7 +122,7 @@ def process_user_input(user_message, conversation_history):
             "category": category,
             "category_score": category_score,
             "all_scores": all_scores,
-            "show_analysis": status in _RUN_DETECTION_STATUSES,
+            "show_analysis": show_analysis,
             "gate_status": status,
         }
 
@@ -155,7 +202,7 @@ def process_user_input(user_message, conversation_history):
         "category": category,
         "category_score": category_score,
         "all_scores": all_scores,
-        "show_analysis": True,
+        "show_analysis": show_analysis,
         "gate_status": "proceed",
     }
 

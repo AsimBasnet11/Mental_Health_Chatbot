@@ -2,7 +2,10 @@ KEYWORD_MAP = {
     "Depression": [
         r"\bdepress(ed|ion|ing)?\b", r"\bsad(ness|ly)?\b", r"\bhopeless(ness)?\b", r"\blonely|loneliness\b", r"\bworthless(ness)?\b",
         r"\bdown\b", r"\bempty\b", r"\btearful\b", r"\bunhappy\b", r"\bno motivation\b", r"\bloss of interest\b", r"\bself-hate\b",
-        r"\bguilt(y)?\b", r"\bhelpless(ness)?\b", r"\btrouble sleeping\b", r"\bcan'?t concentrate\b", r"\bexhaust(ed|ion)\b"
+        r"\bguilt(y)?\b", r"\bhelpless(ness)?\b", r"\btrouble sleeping\b", r"\bcan'?t concentrate\b", r"\bexhaust(ed|ion)\b",
+        r"\bfailed\s+(?:in\s+)?(?:my\s+)?exam(s)?\b", r"\bexam\s+failure\b",
+        r"\blocked\s+in\s+(?:my\s+)?room\b", r"\bhaven'?t\s+talked\s+to\s+anyone\b",
+        r"\bisolat(ed|ing|ion)\b", r"\bwithdraw(n|al)?\b", r"\bavoiding\s+everyone\b"
     ],
     "Anxiety": [
         r"\banxious|anxiety\b", r"\bnervous(ness)?\b", r"\bworry|worried|worrying\b", r"\bpanic(ked|king)?\b",
@@ -31,7 +34,12 @@ _IGNORE_NORMAL = [
 ]
 
 def keyword_state_count(text):
-    """Scan text for mental health keywords, count each state, return the state with the highest count (average if multiple)."""
+    """Scan text for mental health keywords and return the dominant state.
+
+    Returns:
+        (winner_label, purity_ratio)
+        purity_ratio = winner_keyword_matches / total_keyword_matches
+    """
     text = text.lower()
     counts = {k: 0 for k in KEYWORD_MAP}
     total = 0
@@ -54,8 +62,8 @@ def keyword_state_count(text):
     winners = [k for k, v in counts.items() if v == max_count]
     # If tie, pick first alphabetically
     winner = sorted(winners)[0]
-    avg = max_count / sum(counts.values()) if sum(counts.values()) > 0 else 1.0
-    return winner, avg
+    purity_ratio = max_count / sum(counts.values()) if sum(counts.values()) > 0 else 1.0
+    return winner, purity_ratio
 """
 Detection Module
 Loads the emotion (GoEmotions) and mental health (Sentimental-analysis) models
@@ -247,6 +255,173 @@ def _infer_emotion_probs(text, tokenizer, model):
     return probs
 
 
+# ── Follow-up / short-text context awareness ────────────────
+# When the user sends a short follow-up message (e.g. "same", "yeah",
+# "me too"), the model lacks context and often misclassifies it as Normal.
+# We detect these follow-ups and inherit the previous conversation context.
+
+_FOLLOWUP_PATTERNS = re.compile(
+    r"^(same|yeah|yep|yup|yes|exactly|indeed|right|true|absolutely"
+    r"|definitely|certainly|sure|correct|indeed|affirmative"
+    r"|me\s*too|metoo|i\s*feel\s*(the\s*)?same|i\s*agree|ditto"
+    r"|ig\b|i\s*guess|kinda|sorta|somewhat"
+    r"|always|everyday|every\s*day|constantly|all\s*the\s*time"
+    r"|it'?s\s*(the\s*)?same|nothing\s*changed|still\s*the\s*same"
+    r"|still\s*feeling|still\s*same|no\s*change|nope|nah"
+    r"|it'?s\s*been|been\s*like|been\s*feeling)$",
+    re.IGNORECASE,
+)
+
+
+def _is_followup_message(text):
+    """Check if the message is a short follow-up that should inherit previous context."""
+    cleaned = text.lower().strip()
+    # Remove common prefixes
+    cleaned = re.sub(r"^(and |but |well |so |it's |its |it is )", "", cleaned).strip()
+    words = cleaned.split()
+    # Affirmation-led continuation (e.g. "yes can you...", "yeah because...")
+    # often depends on prior context even if slightly longer.
+    if re.match(r"^(yes|yeah|yep|yup)\b", cleaned) and len(words) <= 12:
+        return True
+    # Short messages (under 5 words) that match follow-up patterns
+    if len(words) <= 4 and _FOLLOWUP_PATTERNS.match(cleaned):
+        return True
+    # Very short messages (1-2 words) that are not in the skip list
+    if len(words) <= 2 and cleaned not in _SKIP_EXPAND:
+        return True
+    return False
+
+
+def _is_greeting_like(text):
+    """Detect pure greeting/casual tokens that should not trigger continuity bias."""
+    cleaned = text.lower().strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip("!?.,")
+    greeting_like = {
+        "hi", "hello", "hey", "good morning", "good evening", "good afternoon",
+        "bye", "goodbye", "thanks", "thank you", "ok", "okay", "sure",
+        "yes", "no", "maybe", "greetings", "howdy",
+    }
+    return cleaned in greeting_like
+
+
+def _extract_context_signals(conversation_context):
+    """Extract recent user text and the latest non-Normal label from history."""
+    if not conversation_context:
+        return [], None, 0.0
+
+    context_texts = []
+    latest_non_normal = None
+    latest_non_normal_score = 0.0
+
+    for item in conversation_context:
+        if isinstance(item, dict):
+            content = (item.get("content") or "").strip()
+            category = item.get("category")
+            category_score = float(item.get("category_score", 0.0) or 0.0)
+        else:
+            content = str(item).strip()
+            category = None
+            category_score = 0.0
+
+        if content:
+            context_texts.append(content)
+
+        if category in SENTIMENT_LABELS and category != "Normal":
+            latest_non_normal = category
+            latest_non_normal_score = max(latest_non_normal_score, category_score)
+
+    return context_texts, latest_non_normal, latest_non_normal_score
+
+
+def classify_mental_health_with_context(
+    text,
+    prev_category=None,
+    prev_category_score=0.0,
+    conversation_context=None,
+):
+    """Classify mental health with conversation context for follow-up messages.
+
+    When the current message is a short follow-up (e.g. "same", "yeah"),
+    and the previous message had a non-Normal mental state, the current
+    classification inherits the previous context.
+
+    Args:
+        text: Current user message
+        prev_category: Category label from the previous message (or None)
+        prev_category_score: Confidence of the previous category (0.0-1.0)
+
+    Returns:
+        (category_label: str, confidence: float, all_scores: dict)
+    """
+    context_texts, ctx_category, ctx_score = _extract_context_signals(conversation_context)
+
+    # Prefer explicit previous-turn signal, fallback to context-derived signal.
+    effective_prev_category = prev_category or ctx_category
+    effective_prev_score = max(float(prev_category_score or 0.0), float(ctx_score or 0.0))
+
+    # For short/ambiguous turns, run model on recent context + current message.
+    words = text.split()
+    if context_texts and len(words) <= 6:
+        recent_context = " ".join(context_texts[-3:])
+        contextual_text = f"{recent_context} {text}".strip()
+        label, conf, all_scores = classify_mental_health_with_scores(contextual_text)
+    else:
+        label, conf, all_scores = classify_mental_health_with_scores(text)
+
+    # If this looks like a follow-up and previous context was non-Normal,
+    # inherit the previous category
+    if (effective_prev_category and effective_prev_category != "Normal"
+            and _is_followup_message(text)):
+        # Strongly prefer previous context for explicit follow-up replies.
+        context_weight = 0.8
+        model_weight = 0.2
+        prev_idx = SENTIMENT_LABELS.index(effective_prev_category) if effective_prev_category in SENTIMENT_LABELS else -1
+        if prev_idx >= 0:
+            blended = np.array([all_scores.get(l, 0.0) for l in SENTIMENT_LABELS], dtype=np.float64)
+            blended[prev_idx] = model_weight * float(blended[prev_idx]) + context_weight * effective_prev_score
+            total = blended.sum()
+            if total > 0:
+                blended = blended / total
+            top_idx = int(np.argmax(blended))
+            label = SENTIMENT_LABELS[top_idx]
+            conf = float(blended[top_idx])
+            all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(blended)}
+            log.info("Follow-up context: inheriting %s (%.2f) from previous message", label, conf)
+
+    # Continuity rule: in ongoing non-Normal context, avoid abrupt flips to Normal
+    # on low-signal turns (common in distressed multi-turn chats).
+    if (effective_prev_category and effective_prev_category != "Normal"
+            and label == "Normal"
+            and not _is_greeting_like(text)):
+        prev_idx = SENTIMENT_LABELS.index(effective_prev_category) if effective_prev_category in SENTIMENT_LABELS else -1
+        normal_idx = SENTIMENT_LABELS.index("Normal")
+        if prev_idx >= 0:
+            normal_prob = float(all_scores.get("Normal", 0.0))
+            prev_prob = float(all_scores.get(effective_prev_category, 0.0))
+            # If previous state is meaningful and model margin is small, keep continuity.
+            if effective_prev_score >= 0.35 and (normal_prob - prev_prob) <= 0.30:
+                context_weight = 0.65
+                model_weight = 0.35
+                blended = np.array([all_scores.get(l, 0.0) for l in SENTIMENT_LABELS], dtype=np.float64)
+                blended[prev_idx] = model_weight * float(blended[prev_idx]) + context_weight * effective_prev_score
+                # Slightly reduce Normal so continuity can surface in averages.
+                blended[normal_idx] = max(0.0, blended[normal_idx] * 0.85)
+                total = blended.sum()
+                if total > 0:
+                    blended = blended / total
+                top_idx = int(np.argmax(blended))
+                label = SENTIMENT_LABELS[top_idx]
+                conf = float(blended[top_idx])
+                all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(blended)}
+                log.info(
+                    "Context continuity: keeping %s over abrupt Normal reset (%.2f)",
+                    label,
+                    conf,
+                )
+
+    return (label, conf, all_scores)
+
+
 # ── Suicidal keyword safety net ──────────────────────────────
 # The model is strong but not perfect on safety-critical cases.
 # These keywords act as a FLOOR — they can raise the suicidal score
@@ -317,6 +492,71 @@ def _apply_suicidal_safety_net(probs, text):
     return probs
 
 
+# ── Non-normal keyword safeguard ────────────────────────────
+# Some short self-reports like "i am feeling a little sad" are valid
+# low-intensity distress, but the model can still over-predict Normal.
+_SELF_REPORTED_DISTRESS_RE = re.compile(
+    r"\b(i\s*(?:am|'m|feel|have\s*been|been|was)\b.{0,30}"
+    r"\b(sad|depress(?:ed|ion|ing)?|down|hopeless|lonely|empty"
+    r"|anxious|anxiety|worried|worrying|nervous|panic(?:ked|king)?))\b",
+    re.IGNORECASE,
+)
+
+
+def _apply_keyword_floor(probs, label, floor):
+    """Raise a target label probability to a minimum floor and renormalise."""
+    if label not in SENTIMENT_LABELS:
+        return probs
+
+    idx = SENTIMENT_LABELS.index(label)
+    current = float(probs[idx])
+    if current >= floor:
+        return probs
+
+    boosted = probs.copy()
+    boost = floor - current
+    other_sum = 1.0 - current
+    if other_sum > 0:
+        for i in range(len(boosted)):
+            if i != idx:
+                boosted[i] -= boost * (boosted[i] / other_sum)
+    boosted[idx] = floor
+    return boosted
+
+
+def _resolve_normal_override(probs, margin=0.20, min_candidate=0.15):
+    """If Normal is only slightly above a non-Normal class, prefer the
+    strongest non-Normal signal.
+
+    Returns:
+        (label: str, confidence: float)
+    """
+    normal_idx = SENTIMENT_LABELS.index("Normal")
+    normal_score = float(probs[normal_idx])
+    top_idx = int(np.argmax(probs))
+    top_label = SENTIMENT_LABELS[top_idx]
+    top_conf = float(probs[top_idx])
+
+    if top_label != "Normal":
+        return top_label, top_conf
+
+    best_non_normal_idx = -1
+    best_non_normal_score = -1.0
+    for i, label in enumerate(SENTIMENT_LABELS):
+        if label == "Normal":
+            continue
+        score = float(probs[i])
+        if score > best_non_normal_score:
+            best_non_normal_score = score
+            best_non_normal_idx = i
+
+    if best_non_normal_idx >= 0:
+        if (normal_score - best_non_normal_score) < margin and best_non_normal_score > min_candidate:
+            return SENTIMENT_LABELS[best_non_normal_idx], best_non_normal_score
+
+    return top_label, top_conf
+
+
 # ── Public API ───────────────────────────────────────────────
 
 def detect_emotion(text):
@@ -355,17 +595,8 @@ def classify_mental_health(text):
     expanded = _expand_short_text(cleaned)
     probs = _infer_best_chunk(expanded, tokenizer, model)
     probs = _apply_suicidal_safety_net(probs, cleaned)
-    top_idx = int(np.argmax(probs))
-    # Depression/Normal resolver logic
-    if SENTIMENT_LABELS[top_idx] == "Normal":
-        depression_idx = SENTIMENT_LABELS.index("Depression")
-        depression_score = float(probs[depression_idx])
-        normal_score = float(probs[top_idx])
-        # If Depression is second highest and close to Normal, pick Depression
-        sorted_indices = np.argsort(probs)[::-1]
-        if sorted_indices[1] == depression_idx and (normal_score - depression_score) < 0.20 and depression_score > 0.15:
-            return ("Depression", depression_score)
-    return (SENTIMENT_LABELS[top_idx], float(probs[top_idx]))
+    label, conf = _resolve_normal_override(probs, margin=0.20, min_candidate=0.15)
+    return (label, conf)
 
 
 def classify_mental_health_with_scores(text):
@@ -399,14 +630,22 @@ def classify_mental_health_with_scores(text):
         if total > 0:
             probs = probs / total
 
-    # Check keyword detection as a separate signal
-    keyword_label, keyword_avg = keyword_state_count(cleaned)
+    # Check keyword detection as a separate signal.
+    # For explicit state words (e.g., sad/anxious/hopeless), use keyword purity
+    # as the final category confidence to avoid dilution by unrelated tokens.
+    keyword_label, keyword_purity = keyword_state_count(cleaned)
+    forced_keyword_label = None
+    forced_keyword_conf = None
+
     if keyword_label != "Normal" and keyword_label in SENTIMENT_LABELS:
-        # Blend: boost the keyword-matched class with model's own probability
-        # instead of replacing all scores with binary 1.0/0.0
+        # Keep all_scores probabilistic, but force final label/conf to keyword result.
+        forced_keyword_label = keyword_label
+        forced_keyword_conf = float(keyword_purity)
+
+        # Also nudge all_scores toward the keyword class so charts remain consistent.
         keyword_idx = SENTIMENT_LABELS.index(keyword_label)
         blended = probs.copy()
-        keyword_boost = min(keyword_avg, 0.9)
+        keyword_boost = min(keyword_purity, 0.9)
         model_weight = 0.4
         kw_weight = 1.0 - model_weight
         blended[keyword_idx] = model_weight * float(probs[keyword_idx]) + kw_weight * keyword_boost
@@ -414,18 +653,16 @@ def classify_mental_health_with_scores(text):
         if total > 0:
             probs = blended / total
 
-    top_idx = int(np.argmax(probs))
-    depression_idx = SENTIMENT_LABELS.index("Depression")
-    depression_score = float(probs[depression_idx])
-    normal_score = float(probs[SENTIMENT_LABELS.index("Normal")])
-    sorted_indices = np.argsort(probs)[::-1]
-    label = SENTIMENT_LABELS[top_idx]
-    conf = float(probs[top_idx])
-    # Depression/Normal resolver logic
-    if label == "Normal":
-        if sorted_indices[1] == depression_idx and (normal_score - depression_score) < 0.20 and depression_score > 0.15:
-            label = "Depression"
-            conf = depression_score
+    # If user explicitly self-reports mild distress, keep the relevant
+    # non-Normal class from being drowned out by a high Normal score.
+    if keyword_label != "Normal" and _SELF_REPORTED_DISTRESS_RE.search(cleaned):
+        floor = 0.45 if keyword_label == "Depression" else 0.40
+        probs = _apply_keyword_floor(probs, keyword_label, floor)
+
+    label, conf = _resolve_normal_override(probs, margin=0.20, min_candidate=0.15)
+    if forced_keyword_label is not None:
+        label = forced_keyword_label
+        conf = forced_keyword_conf if forced_keyword_conf is not None else conf
     all_scores = {SENTIMENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(probs)}
     return (label, conf, all_scores)
 
@@ -452,9 +689,7 @@ def analyze_full(text):
     s_tok, s_model = _load_sentiment_model()
     s_probs = _infer_best_chunk(expanded, s_tok, s_model)
     s_probs = _apply_suicidal_safety_net(s_probs, cleaned)
-    s_top_idx = int(np.argmax(s_probs))
-    s_label = SENTIMENT_LABELS[s_top_idx]
-    s_conf = float(s_probs[s_top_idx])
+    s_label, s_conf = _resolve_normal_override(s_probs, margin=0.20, min_candidate=0.15)
     suicidal_conf = float(s_probs[SUICIDAL_IDX])
     high_risk = s_label == "Suicidal"
 

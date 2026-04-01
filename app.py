@@ -374,12 +374,18 @@ async def tts(body: TTSIn):
         raise HTTPException(400, "Text cannot be empty.")
     
     text = body.text.strip()[:2000]
-    # Enforce female voice if requested voice is male or unspecified
-    female_voice = body.voice if "Neural" in body.voice and ("Jenny" in body.voice or "Aria" in body.voice or "Emma" in body.voice or "Ava" in body.voice) else "en-US-JennyNeural"
+    # Strict female-only allowlist. Any other request falls back to Jenny.
+    allowed_voices = {
+        "en-US-JennyNeural",
+        "en-US-AriaNeural",
+        "en-US-EmmaNeural",
+        "en-US-AvaNeural",
+    }
+    selected_voice = body.voice if body.voice in allowed_voices else "en-US-JennyNeural"
     
     async def audio_generator():
         try:
-            communicate = edge_tts.Communicate(text, female_voice, rate="+0%", pitch="+0Hz")
+            communicate = edge_tts.Communicate(text, selected_voice, rate="+0%", pitch="+0Hz")
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
                     yield chunk["data"]
